@@ -5,6 +5,7 @@ import com.sumit.backend.account.entity.Role;
 public class JwtResponse {
     private String token;
     private Integer userId;
+    //note spring boot sees type Role returns enum so it calls role.name() which returns the string eg student
     private Role role;
 
     // Constructor

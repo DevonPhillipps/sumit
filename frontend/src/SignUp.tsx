@@ -16,7 +16,7 @@ function SignUp() {
         phoneNumber: "",
         password: "",
         confirmPassword: "",
-        role: "student"
+        role: "student",
     });
     const [isLoading, setIsLoading] = useState(false);
     const [showPassword, setShowPassword] = useState(false);
@@ -26,9 +26,9 @@ function SignUp() {
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const { name, value } = e.target;
-        setFormData(prev => ({
+        setFormData((prev) => ({
             ...prev,
-            [name]: value
+            [name]: value,
         }));
 
         if (name === "password" || name === "confirmPassword") {
@@ -63,56 +63,57 @@ function SignUp() {
 
             const signupData = {
                 ...dataToSend,
-                phoneNumber: phoneNumber,
-                role: "student"
+                phoneNumber,
+                role: "student", // enforce student for now
             };
 
-            const response = await fetch('http://localhost:8080/api/auth/signup', {
-                method: 'POST',
+            const response = await fetch("http://localhost:8080/api/auth/signup", {
+                method: "POST",
                 headers: {
-                    'Content-Type': 'application/json',
+                    "Content-Type": "application/json",
                 },
-                body: JSON.stringify(signupData)
+                body: JSON.stringify(signupData),
             });
 
-            const responseText = await response.text();
-
             if (response.ok) {
-                try {
-                    const jwtResponse: JwtResponse = JSON.parse(responseText);
-                    console.log('Signup successful!', jwtResponse);
+                const jwtResponse: JwtResponse = await response.json();
+                console.log("Signup successful!", jwtResponse);
 
-                    localStorage.setItem('token', jwtResponse.token);
-                    localStorage.setItem('userId', jwtResponse.userId.toString());
-                    localStorage.setItem('userRole', jwtResponse.role);
+                // Auto-login: store auth info
+                localStorage.setItem("token", jwtResponse.token);
+                localStorage.setItem("userId", jwtResponse.userId.toString());
+                localStorage.setItem("userRole", jwtResponse.role);
 
-                    navigate("/");
-                } catch (parseError) {
-                    console.error('Failed to parse response:', parseError);
-                    setErrorMessage('Invalid response from server');
-                }
+                navigate("/");
             } else {
+                const responseText = await response.text();
                 try {
                     const errorData = JSON.parse(responseText);
-                    setErrorMessage(errorData.error || `Signup failed: ${response.statusText}`);
+                    setErrorMessage(
+                        errorData.error || `Signup failed: ${response.statusText}`
+                    );
                 } catch {
-                    setErrorMessage(`Signup failed: ${response.statusText || responseText}`);
+                    setErrorMessage(
+                        `Signup failed: ${response.statusText || responseText}`
+                    );
                 }
             }
         } catch (error) {
-            console.error('Error:', error);
-            setErrorMessage('Network error - make sure backend is running on localhost:8080');
+            console.error("Error:", error);
+            setErrorMessage(
+                "Network error - make sure backend is running on localhost:8080"
+            );
         } finally {
             setIsLoading(false);
         }
     };
 
     const togglePasswordVisibility = () => {
-        setShowPassword(!showPassword);
+        setShowPassword((prev) => !prev);
     };
 
     const toggleConfirmPasswordVisibility = () => {
-        setShowConfirmPassword(!showConfirmPassword);
+        setShowConfirmPassword((prev) => !prev);
     };
 
     return (
@@ -233,12 +234,27 @@ function SignUp() {
                             >
                                 {showPassword ? (
                                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.878 9.878L6.59 6.59m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
+                                        <path
+                                            strokeLinecap="round"
+                                            strokeLinejoin="round"
+                                            strokeWidth={2}
+                                            d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.878 9.878L6.59 6.59m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21"
+                                        />
                                     </svg>
                                 ) : (
                                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                        <path
+                                            strokeLinecap="round"
+                                            strokeLinejoin="round"
+                                            strokeWidth={2}
+                                            d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+                                        />
+                                        <path
+                                            strokeLinecap="round"
+                                            strokeLinejoin="round"
+                                            strokeWidth={2}
+                                            d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
+                                        />
                                     </svg>
                                 )}
                             </button>
@@ -267,12 +283,27 @@ function SignUp() {
                             >
                                 {showConfirmPassword ? (
                                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.878 9.878L6.59 6.59m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
+                                        <path
+                                            strokeLinecap="round"
+                                            strokeLinejoin="round"
+                                            strokeWidth={2}
+                                            d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.878 9.878L6.59 6.59m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21"
+                                        />
                                     </svg>
                                 ) : (
                                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                        <path
+                                            strokeLinecap="round"
+                                            strokeLinejoin="round"
+                                            strokeWidth={2}
+                                            d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+                                        />
+                                        <path
+                                            strokeLinecap="round"
+                                            strokeLinejoin="round"
+                                            strokeWidth={2}
+                                            d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
+                                        />
                                     </svg>
                                 )}
                             </button>

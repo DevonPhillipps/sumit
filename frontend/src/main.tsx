@@ -6,6 +6,7 @@ import App from './App.tsx'
 import SignUp from './SignUp.tsx'
 import Login from './Login.tsx'
 import BecomeTutorPage from "./BecomeTutorPage";
+import StudentDashboard from "./StudentDashboard";
 
 createRoot(document.getElementById('root')!).render(
     <StrictMode>
@@ -15,6 +16,7 @@ createRoot(document.getElementById('root')!).render(
                 <Route path="/signup" element={<SignUp />} />
                 <Route path="/login" element={<Login />} />
                 <Route path="/become-tutor" element={<BecomeTutorPage />} />
+                <Route path="/student-dashboard" element={<StudentDashboard />} />
             </Routes>
         </BrowserRouter>
     </StrictMode>,

@@ -1,0 +1,3 @@
+ALTER TABLE tutors
+ALTER COLUMN age TYPE smallint
+USING age::SMALLINT;

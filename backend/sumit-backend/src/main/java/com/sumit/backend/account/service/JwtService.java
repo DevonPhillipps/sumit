@@ -1,69 +1,106 @@
 package com.sumit.backend.account.service;
 
-import com.sumit.backend.account.entity.Role;
-import io.jsonwebtoken.*;
+import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.Jwts;
+import io.jsonwebtoken.SignatureAlgorithm;
+import io.jsonwebtoken.io.Decoders;
 import io.jsonwebtoken.security.Keys;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Service;
+
 import javax.crypto.SecretKey;
+import java.security.Key;
 import java.util.Date;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.function.Function;
 
 @Service
 public class JwtService {
 
-    //todo change secret key in production. make sure it will also work on the server not just locally!!!
-    private final String SECRET = "your-256-bit-secret-change-this-in-production";
-    private final SecretKey SECRET_KEY = Keys.hmacShaKeyFor(SECRET.getBytes());
+    @Value("${jwt.secret}")
+    private String secretKey;
 
-    // 24 hours token length in ms
-    private final long EXPIRATION_TIME = 1000 * 60 * 60 * 24;
+    @Value("${jwt.expiration}")
+    private long jwtExpiration;
 
-    /**
-     * Create JWT token for a user
-     */
+    // Generate token with username (email), userId and role
     public String generateToken(Integer userId, String role) {
+        Map<String, Object> claims = new HashMap<>();
+        claims.put("role", role);
+
         return Jwts.builder()
-                .claim("userId", userId)
-                .claim("role", role)
-                .setIssuedAt(new Date())
-                .setExpiration(new Date(System.currentTimeMillis() + EXPIRATION_TIME))
-                .signWith(SECRET_KEY, SignatureAlgorithm.HS256)
+                .setClaims(claims)
+                .setSubject(userId.toString())  // subject = userId
+                .setIssuedAt(new Date(System.currentTimeMillis()))
+                .setExpiration(new Date(System.currentTimeMillis() + jwtExpiration))
+                .signWith(getSignKey(), SignatureAlgorithm.HS256)
                 .compact();
     }
 
-    /**
-     * Extract user ID from token
-     */
-    public Integer extractUserId(String token) {
-        return parseToken(token).get("userId", Integer.class);
+    // Overload: pass enum directly
+    public String generateToken(Integer userId, Enum<?> role) {
+        return generateToken(userId, role.name());
     }
 
-    /**
-     * Extract user role from token
-     */
+    // Extract user id from token
+    public String extractUserId(String token) {
+        return extractClaim(token, Claims::getSubject);
+    }
+
+    // Extract role from token
     public String extractRole(String token) {
-        return parseToken(token).get("role", String.class);
+        return extractClaim(token, claims -> claims.get("role", String.class));
     }
 
-    /**
-     * Validate token (signature + expiration)
-     */
+    public boolean isTokenValid(String token, UserDetails userDetails) {
+        final String userId = extractUserId(token);
+        // UserDetails.getUsername() should return the userId string
+        return (userId.equals(userDetails.getUsername())) && !isTokenExpired(token);
+    }
+
+    // Your existing method for non-Spring Security use
     public boolean isValidToken(String token) {
         try {
-            parseToken(token);
-            return true;
+            Jwts.parserBuilder()
+                    .setSigningKey(getSignKey())
+                    .build()
+                    .parseClaimsJws(token);
+            return !isTokenExpired(token);
         } catch (Exception e) {
             return false;
         }
     }
 
-    /**
-     * Parse and validate token
-     */
-    private Claims parseToken(String token) {
+    // Check if token expired
+    private boolean isTokenExpired(String token) {
+        return extractExpiration(token).before(new Date());
+    }
+
+    // Extract expiration date
+    private Date extractExpiration(String token) {
+        return extractClaim(token, Claims::getExpiration);
+    }
+
+    // Generic method to extract any claim
+    private <T> T extractClaim(String token, Function<Claims, T> claimsResolver) {
+        final Claims claims = extractAllClaims(token);
+        return claimsResolver.apply(claims);
+    }
+
+    // Extract all claims from token
+    private Claims extractAllClaims(String token) {
         return Jwts.parserBuilder()
-                .setSigningKey(SECRET_KEY)
+                .setSigningKey(getSignKey())
                 .build()
                 .parseClaimsJws(token)
                 .getBody();
+    }
+
+    // Get signing key
+    private Key getSignKey() {
+        byte[] keyBytes = Decoders.BASE64.decode(secretKey);
+        return Keys.hmacShaKeyFor(keyBytes);
     }
 }

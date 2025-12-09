@@ -4,22 +4,33 @@ import com.sumit.backend.account.dto.JwtResponse;
 import com.sumit.backend.account.dto.LoginDTO;
 import com.sumit.backend.account.dto.SignUpDTO;
 import com.sumit.backend.account.entity.User;
+import com.sumit.backend.account.entity.Role;
 import com.sumit.backend.account.repository.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class AuthService {
-    @Autowired
-    UserRepository userRepository;
 
     @Autowired
-    JwtService jwtService;
+    private UserRepository userRepository;
 
-    private BCryptPasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
+    @Autowired
+    private JwtService jwtService;
 
-    //todo verify email and phone nr so that hackers dont know if email is already registered and no one can steal other peopels emails
+    @Autowired
+    private PasswordEncoder passwordEncoder;
+
+    @Autowired
+    private AuthenticationManager authenticationManager;
+
+    @Transactional
     public JwtResponse signUp(SignUpDTO signUpDTO) {
         if (userRepository.existsByEmail(signUpDTO.getEmail())) {
             throw new RuntimeException("Email already registered!");
@@ -31,34 +42,42 @@ public class AuthService {
 
         User newUser = new User();
         newUser.setEmail(signUpDTO.getEmail());
-        //todo use spring security beans for password hash
         newUser.setPasswordHash(passwordEncoder.encode(signUpDTO.getPassword()));
         newUser.setPhoneNumber(signUpDTO.getPhoneNumber());
         newUser.setFirstName(signUpDTO.getFirstName());
         newUser.setSurname(signUpDTO.getSurname());
-        newUser.setRole(signUpDTO.getRole());
+
+        // Use DTO role or default to student
+        Role role = (signUpDTO.getRole() != null) ? signUpDTO.getRole() : Role.student;
+        newUser.setRole(role);
 
         userRepository.save(newUser);
 
-        String token = jwtService.generateToken(newUser.getId(), newUser.getRole().name());
+        // Token subject = userId, role in claims
+        String token = jwtService.generateToken(newUser.getId(), newUser.getRole());
 
-        return new JwtResponse(token, newUser.getId(), newUser.getRole()
-        );
+        return new JwtResponse(token, newUser.getId(), newUser.getRole());
     }
 
     public JwtResponse login(LoginDTO loginDTO) {
-        User user = userRepository.findByEmail(loginDTO.getEmail());
-        if (user != null) {
-            //remember if we encode the password and use .equals the hashes for the same password wont match hence use .match
-            //todo use spring security beans for password hash
-            if (passwordEncoder.matches(loginDTO.getPassword(), user.getPasswordHash())) {
-                String token = jwtService.generateToken(user.getId(), user.getRole().name());
-                return new JwtResponse(token, user.getId(), user.getRole());
-            } else {
-                throw new RuntimeException("Invalid credentials");
-            }
-        } else {
-            throw new RuntimeException("Invalid credentials");
-        }
+        // 1) Let Spring Security authenticate (email + password)
+        Authentication authentication = authenticationManager.authenticate(
+                new UsernamePasswordAuthenticationToken(
+                        loginDTO.getEmail(),
+                        loginDTO.getPassword()
+                )
+        );
+
+        SecurityContextHolder.getContext().setAuthentication(authentication);
+
+        // 2) Load the user from DB (using Optional correctly)
+        User user = userRepository.findByEmail(loginDTO.getEmail())
+                .orElseThrow(() -> new RuntimeException("Invalid email or password"));
+
+        // 3) Generate JWT using userId + role
+        String token = jwtService.generateToken(user.getId(), user.getRole());
+
+        return new JwtResponse(token, user.getId(), user.getRole());
     }
+
 }

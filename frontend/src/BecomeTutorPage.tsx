@@ -12,7 +12,7 @@ interface FormData {
     age: string;
     location: string;
     experience: string;
-    languages: string[];  // Changed from single language to array
+    preferredLanguage: string;
     subjects: {
         math: SubjectData;
         accounting: SubjectData;
@@ -26,7 +26,7 @@ function BecomeTutorPage() {
         age: "",
         location: "",
         experience: "",
-        languages: [],  // Initialize as empty array
+        preferredLanguage: "",
         subjects: {
             math: { selected: false, mark: "", grades: [] },
             accounting: { selected: false, mark: "", grades: [] },
@@ -40,27 +40,10 @@ function BecomeTutorPage() {
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
         const { name, value } = e.target;
-
-        if (name === "location" || name === "age" || name === "experience") {
-            setFormData(prev => ({
-                ...prev,
-                [name]: value
-            }));
-        }
-    };
-
-    const handleLanguageToggle = (language: string) => {
-        setFormData(prev => {
-            const currentLanguages = prev.languages;
-            const newLanguages = currentLanguages.includes(language)
-                ? currentLanguages.filter(l => l !== language)
-                : [...currentLanguages, language];
-
-            return {
-                ...prev,
-                languages: newLanguages
-            };
-        });
+        setFormData(prev => ({
+            ...prev,
+            [name]: value
+        }));
     };
 
     const handleSubjectToggle = (subject: keyof FormData['subjects']) => {
@@ -126,14 +109,21 @@ function BecomeTutorPage() {
             return;
         }
 
-        // Validate at least one language selected
-        if (formData.languages.length === 0) {
-            alert("Please select at least one language you can teach in.");
+        // Validate preferred language
+        if (!formData.preferredLanguage) {
+            alert("Please select your preferred teaching language.");
             setIsLoading(false);
             return;
         }
 
-        // Validate at least one subject selected
+        // Validate location
+        if (!formData.location) {
+            alert("Please select a location.");
+            setIsLoading(false);
+            return;
+        }
+
+        // Validate at least one subject
         const selectedSubjects = Object.entries(formData.subjects).filter(([_, data]) => data.selected);
         if (selectedSubjects.length === 0) {
             alert("Please select at least one subject to teach.");
@@ -141,7 +131,7 @@ function BecomeTutorPage() {
             return;
         }
 
-        // Validate marks for selected subjects
+        // Validate subject details
         for (const [subject, data] of selectedSubjects) {
             if (!data.mark || parseInt(data.mark) < 0 || parseInt(data.mark) > 100) {
                 alert(`Please enter a valid mark (0-100) for ${subject}.`);
@@ -155,36 +145,58 @@ function BecomeTutorPage() {
             }
         }
 
-        // Prepare data for backend
+        // Prepare data EXACTLY matching your backend DTOs
         const applicationData = {
-            age: formData.age,
-            location: formData.location,
-            experience: formData.experience,
-            languages: formData.languages,
-            subjects: selectedSubjects.map(([subject, data]) => ({
-                subject,
+            age: parseInt(formData.age),
+            town: {
+                town: formData.location
+            },
+            teachingExperience: formData.experience,
+            preferredLanguage: {
+                language: formData.preferredLanguage
+            },
+            subjects: selectedSubjects.map(([subjectName, data]) => ({
+                subject: subjectName,
                 mark: parseInt(data.mark),
                 grades: data.grades
             }))
         };
 
-        console.log("Submitting tutor application:", applicationData);
+        console.log("Submitting tutor application:", JSON.stringify(applicationData, null, 2));
 
-        // TODO: Connect to backend API
+        // REAL API CALL (uncomment and update URL/token)
         try {
-            // const response = await fetch('http://localhost:8080/api/tutor/apply', {
-            //     method: 'POST',
-            //     headers: { 'Content-Type': 'application/json' },
-            //     body: JSON.stringify(applicationData)
-            // });
+            const token = localStorage.getItem("token"); // or your auth token
+            const response = await fetch('http://localhost:8080/api/tutor/become-a-tutor', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify(applicationData)
+            });
 
-            // Simulate API call
-            await new Promise(resolve => setTimeout(resolve, 1000));
+            if (!response.ok) {
+                const errorText = await response.text();
+                console.error("Backend error:", errorText);
+                throw new Error(`HTTP ${response.status}: ${errorText}`);
+            }
+
+            const result = await response.json();
+            console.log("Success:", result);
+
             alert("Tutor application submitted successfully! We'll review your application and get back to you soon.");
             navigate("/");
+
         } catch (error) {
-            console.error('Error:', error);
-            alert('Failed to submit application. Please try again.');
+            console.error('Error submitting application:', error);
+
+            let errorMessage = "Failed to submit application. Please try again.";
+            if (error instanceof Error) {
+                errorMessage = error.message;
+            }
+
+            alert(errorMessage);
         } finally {
             setIsLoading(false);
         }
@@ -252,20 +264,21 @@ function BecomeTutorPage() {
                         </div>
                     </div>
 
-                    {/* Languages Section */}
+                    {/* Preferred Language Section */}
                     <div>
-                        <h2 className="text-xl font-semibold mb-4">Languages You Can Teach In *</h2>
-                        <p className="text-sm text-slate-400 mb-4">Select all languages you're comfortable teaching in</p>
+                        <h2 className="text-xl font-semibold mb-4">Preferred Teaching Language *</h2>
+                        <p className="text-sm text-slate-400 mb-4">Select the language you're most comfortable teaching in</p>
 
                         <div className="flex flex-wrap gap-4">
                             {languageOptions.map((language) => (
                                 <div key={language} className="flex items-center gap-3">
                                     <input
-                                        type="checkbox"
+                                        type="radio"
                                         id={`lang-${language}`}
-                                        checked={formData.languages.includes(language)}
-                                        onChange={() => handleLanguageToggle(language)}
-                                        className="w-5 h-5 text-sky-500 bg-slate-700 border-slate-600 rounded focus:ring-sky-500"
+                                        name="preferredLanguage"
+                                        checked={formData.preferredLanguage === language}
+                                        onChange={() => setFormData(prev => ({ ...prev, preferredLanguage: language }))}
+                                        className="w-5 h-5 text-sky-500 bg-slate-700 border-slate-600 focus:ring-sky-500"
                                     />
                                     <label
                                         htmlFor={`lang-${language}`}

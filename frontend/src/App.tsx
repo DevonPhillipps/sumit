@@ -1,28 +1,160 @@
 import { useNavigate } from "react-router-dom";
+import { useState } from "react";
 
 function App() {
     const navigate = useNavigate();
+    const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
+
+    const isAuthenticated = !!localStorage.getItem("token");
+    const userRole = localStorage.getItem("userRole") || "student";
+
+    const handleSignOut = () => {
+        localStorage.removeItem("token");
+        localStorage.removeItem("userId");
+        localStorage.removeItem("userRole");
+        setIsProfileMenuOpen(false);
+        navigate("/login");
+    };
+
+    const toggleProfileMenu = () => {
+        setIsProfileMenuOpen((prev) => !prev);
+    };
 
     return (
         <div className="min-h-screen flex flex-col bg-slate-950 text-slate-100 overflow-x-hidden">
             {/* HEADER */}
-            <header className="border-b border-slate-800 px-4 py-3 flex items-center justify-between">
-                <div className="font-semibold text-lg tracking-tight">Sumit</div>
-
-                <div className="flex gap-3">
-                    <button
-                        className="text-sm px-3 py-1 rounded-full border border-slate-700 hover:border-sky-500 transition"
-                        onClick={() => navigate("/login")}
-                    >
-                        Log in
-                    </button>
-                    <button
-                        className="text-sm px-3 py-1 rounded-full bg-sky-500 hover:bg-sky-400 text-black font-medium transition"
-                        onClick={() => navigate("/signup")}
-                    >
-                        Sign up
-                    </button>
+            <header className="border-b border-slate-800 px-4 py-3 flex items-center justify-between relative z-20 bg-slate-950/80 backdrop-blur">
+                <div
+                    className="font-semibold text-lg tracking-tight cursor-pointer"
+                    onClick={() => navigate("/student-dashboard")}
+                >
+                    Sumit
                 </div>
+
+                {/* RIGHT SIDE */}
+                {!isAuthenticated ? (
+                    // Not logged in → show Login / Sign up
+                    <div className="flex gap-3">
+                        <button
+                            className="text-sm px-3 py-1 rounded-full border border-slate-700 hover:border-sky-500 transition"
+                            onClick={() => navigate("/login")}
+                        >
+                            Log in
+                        </button>
+                        <button
+                            className="text-sm px-3 py-1 rounded-full bg-sky-500 hover:bg-sky-400 text-black font-medium transition"
+                            onClick={() => navigate("/signup")}
+                        >
+                            Sign up
+                        </button>
+                    </div>
+                ) : (
+                    // Logged in → show profile avatar + dropdown
+                    <div className="relative">
+                        <button
+                            onClick={toggleProfileMenu}
+                            className="flex items-center gap-2 px-2 py-1 rounded-full border border-slate-700 bg-slate-900/80 hover:border-sky-500 transition"
+                        >
+                            <div className="h-8 w-8 rounded-full bg-sky-500/90 flex items-center justify-center text-xs font-semibold text-black">
+                                {/* Generic avatar icon */}
+                                <svg
+                                    className="h-4 w-4"
+                                    viewBox="0 0 24 24"
+                                    fill="none"
+                                    stroke="currentColor"
+                                >
+                                    <path
+                                        d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4z"
+                                        strokeWidth="1.8"
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                    />
+                                    <path
+                                        d="M4 20c0-2.7614 3.134-5 8-5s8 2.2386 8 5"
+                                        strokeWidth="1.8"
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                    />
+                                </svg>
+                            </div>
+                            <div className="hidden sm:flex flex-col items-start">
+                <span className="text-xs uppercase tracking-wide text-slate-400">
+                  Signed in as
+                </span>
+                                <span className="text-xs font-medium text-slate-100">
+                  {userRole}
+                </span>
+                            </div>
+                            <svg
+                                className={`h-4 w-4 text-slate-400 transition-transform ${
+                                    isProfileMenuOpen ? "rotate-180" : ""
+                                }`}
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                            >
+                                <path
+                                    d="M6 9l6 6 6-6"
+                                    strokeWidth="1.8"
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                />
+                            </svg>
+                        </button>
+
+                        {isProfileMenuOpen && (
+                            <div className="absolute right-0 mt-2 w-64 rounded-2xl bg-slate-900 border border-slate-800 shadow-xl shadow-slate-950/70 py-2 z-30">
+                                <div className="px-4 pb-2">
+                                    <p className="text-xs uppercase tracking-wide text-slate-500">
+                                        Account
+                                    </p>
+                                    <p className="text-sm text-slate-200 mt-1">
+                                        {userRole === "tutor" ? "Tutor account" : "Student account"}
+                                    </p>
+                                </div>
+
+                                <button
+                                    className="w-full text-left px-4 py-2 text-sm text-slate-200 hover:bg-slate-800/80 transition"
+                                    onClick={() => {
+                                        setIsProfileMenuOpen(false);
+                                        navigate("/profile");
+                                    }}
+                                >
+                                    Profile
+                                </button>
+
+                                <button
+                                    className="w-full text-left px-4 py-2 text-sm text-slate-200 hover:bg-slate-800/80 transition"
+                                    onClick={() => {
+                                        setIsProfileMenuOpen(false);
+                                        navigate("/my-sessions");
+                                    }}
+                                >
+                                    My sessions
+                                </button>
+
+                                <button
+                                    className="w-full text-left px-4 py-2 text-sm text-slate-200 hover:bg-slate-800/80 transition"
+                                    onClick={() => {
+                                        setIsProfileMenuOpen(false);
+                                        navigate("/become-tutor");
+                                    }}
+                                >
+                                    Become a tutor
+                                </button>
+
+                                <div className="my-1 border-t border-slate-800" />
+
+                                <button
+                                    className="w-full text-left px-4 py-2 text-sm text-red-400 hover:bg-red-500/10 transition"
+                                    onClick={handleSignOut}
+                                >
+                                    Sign out
+                                </button>
+                            </div>
+                        )}
+                    </div>
+                )}
             </header>
 
             {/* MAIN */}
@@ -86,8 +218,8 @@ function App() {
                                 <h1 className="text-4xl md:text-5xl font-bold tracking-tight">
                                     Struggling to get those grades up?
                                     <span className="block text-sky-400 mt-2">
-                                        Find a tutor in under 5 clicks!
-                                    </span>
+                    Find a tutor in under 5 clicks!
+                  </span>
                                 </h1>
 
                                 <div className="flex flex-col sm:flex-row gap-3 justify-center md:justify-start">
