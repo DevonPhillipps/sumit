@@ -14,7 +14,7 @@ interface FormData {
     experience: string;
     preferredLanguage: string;
     subjects: {
-        math: SubjectData;
+        mathematics: SubjectData;
         accounting: SubjectData;
         physics: SubjectData;
     };
@@ -28,7 +28,7 @@ function BecomeTutorPage() {
         experience: "",
         preferredLanguage: "",
         subjects: {
-            math: { selected: false, mark: "", grades: [] },
+            mathematics: { selected: false, mark: "", grades: [] },
             accounting: { selected: false, mark: "", grades: [] },
             physics: { selected: false, mark: "", grades: [] },
         }

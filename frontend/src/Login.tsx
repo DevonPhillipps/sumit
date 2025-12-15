@@ -4,7 +4,7 @@ import { useState } from "react";
 interface JwtResponse {
     token: string;
     userId: number;
-    role: string;
+    role: string; // "student" | "tutor" | "admin"
 }
 
 function Login() {
@@ -44,9 +44,10 @@ function Login() {
                 // Store auth info
                 localStorage.setItem("token", data.token);
                 localStorage.setItem("userId", data.userId.toString());
-                localStorage.setItem("userRole", data.role);
+                localStorage.setItem("userRole", data.role); // "student" | "tutor" | "admin"
 
-                navigate("/");
+                // Redirect directly to correct dashboard
+                navigate(`/dashboard/${data.role}`, { replace: true });
             } else {
                 const errorText = await response.text();
                 console.error("Login failed:", errorText);

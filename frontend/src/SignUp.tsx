@@ -4,7 +4,7 @@ import { useState } from "react";
 interface JwtResponse {
     token: string;
     userId: number;
-    role: string;
+    role: string; // "student" | "tutor" | "admin"
 }
 
 function SignUp() {
@@ -84,7 +84,8 @@ function SignUp() {
                 localStorage.setItem("userId", jwtResponse.userId.toString());
                 localStorage.setItem("userRole", jwtResponse.role);
 
-                navigate("/");
+                // Redirect straight to correct dashboard
+                navigate(`/dashboard/${jwtResponse.role}`, { replace: true });
             } else {
                 const responseText = await response.text();
                 try {

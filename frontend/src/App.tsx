@@ -1,12 +1,20 @@
 import { useNavigate } from "react-router-dom";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 function App() {
     const navigate = useNavigate();
     const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
 
-    const isAuthenticated = !!localStorage.getItem("token");
-    const userRole = localStorage.getItem("userRole") || "student";
+    const token = localStorage.getItem("token");
+    const userRole = (localStorage.getItem("userRole") || "student") as "student" | "tutor" | "admin";
+    const isAuthenticated = !!token;
+
+    // If user is logged in, redirect them away from landing page to their dashboard
+    useEffect(() => {
+        if (isAuthenticated) {
+            navigate(`/dashboard/${userRole}`, { replace: true });
+        }
+    }, [isAuthenticated, userRole, navigate]);
 
     const handleSignOut = () => {
         localStorage.removeItem("token");
@@ -20,13 +28,21 @@ function App() {
         setIsProfileMenuOpen((prev) => !prev);
     };
 
+    const handleLogoClick = () => {
+        if (isAuthenticated) {
+            navigate(`/dashboard/${userRole}`);
+        } else {
+            navigate("/");
+        }
+    };
+
     return (
         <div className="min-h-screen flex flex-col bg-slate-950 text-slate-100 overflow-x-hidden">
             {/* HEADER */}
             <header className="border-b border-slate-800 px-4 py-3 flex items-center justify-between relative z-20 bg-slate-950/80 backdrop-blur">
                 <div
                     className="font-semibold text-lg tracking-tight cursor-pointer"
-                    onClick={() => navigate("/student-dashboard")}
+                    onClick={handleLogoClick}
                 >
                     Sumit
                 </div>
@@ -56,7 +72,6 @@ function App() {
                             className="flex items-center gap-2 px-2 py-1 rounded-full border border-slate-700 bg-slate-900/80 hover:border-sky-500 transition"
                         >
                             <div className="h-8 w-8 rounded-full bg-sky-500/90 flex items-center justify-center text-xs font-semibold text-black">
-                                {/* Generic avatar icon */}
                                 <svg
                                     className="h-4 w-4"
                                     viewBox="0 0 24 24"
@@ -78,12 +93,12 @@ function App() {
                                 </svg>
                             </div>
                             <div className="hidden sm:flex flex-col items-start">
-                <span className="text-xs uppercase tracking-wide text-slate-400">
-                  Signed in as
-                </span>
+                                <span className="text-xs uppercase tracking-wide text-slate-400">
+                                    Signed in as
+                                </span>
                                 <span className="text-xs font-medium text-slate-100">
-                  {userRole}
-                </span>
+                                    {userRole}
+                                </span>
                             </div>
                             <svg
                                 className={`h-4 w-4 text-slate-400 transition-transform ${
@@ -109,7 +124,11 @@ function App() {
                                         Account
                                     </p>
                                     <p className="text-sm text-slate-200 mt-1">
-                                        {userRole === "tutor" ? "Tutor account" : "Student account"}
+                                        {userRole === "tutor"
+                                            ? "Tutor account"
+                                            : userRole === "admin"
+                                                ? "Admin account"
+                                                : "Student account"}
                                     </p>
                                 </div>
 
@@ -218,8 +237,8 @@ function App() {
                                 <h1 className="text-4xl md:text-5xl font-bold tracking-tight">
                                     Struggling to get those grades up?
                                     <span className="block text-sky-400 mt-2">
-                    Find a tutor in under 5 clicks!
-                  </span>
+                                        Find a tutor in under 5 clicks!
+                                    </span>
                                 </h1>
 
                                 <div className="flex flex-col sm:flex-row gap-3 justify-center md:justify-start">

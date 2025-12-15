@@ -51,16 +51,22 @@ function StudentDashboard() {
     const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
 
     const token = localStorage.getItem("token");
-    const userRole = localStorage.getItem("userRole") || "student";
+    const userRole = (localStorage.getItem("userRole") || "student") as "student" | "tutor" | "admin";
     const isAuthenticated = !!token;
     const isStudent = userRole === "student";
 
-    // Guard: if no token, send to login
+    // Guard: ensure only logged-in students see this dashboard
     useEffect(() => {
         if (!token) {
-            navigate("/login");
+            navigate("/login", { replace: true });
+            return;
         }
-    }, [token, navigate]);
+
+        if (userRole !== "student") {
+            // If logged in but not a student, redirect to correct dashboard
+            navigate(`/dashboard/${userRole}`, { replace: true });
+        }
+    }, [token, userRole, navigate]);
 
     const handleSignOut = () => {
         localStorage.removeItem("token");
@@ -74,13 +80,17 @@ function StudentDashboard() {
         setIsProfileMenuOpen((prev) => !prev);
     };
 
+    const handleLogoClick = () => {
+        navigate("/dashboard/student");
+    };
+
     return (
         <div className="min-h-screen flex flex-col bg-slate-950 text-slate-100 overflow-x-hidden">
-            {/* HEADER – identical to App.tsx */}
+            {/* HEADER */}
             <header className="border-b border-slate-800 px-4 py-3 flex items-center justify-between relative z-20 bg-slate-950/80 backdrop-blur">
                 <div
                     className="font-semibold text-lg tracking-tight cursor-pointer"
-                    onClick={() => navigate("/student-dashboard")}
+                    onClick={handleLogoClick}
                 >
                     Sumit
                 </div>
@@ -160,7 +170,11 @@ function StudentDashboard() {
                                         Account
                                     </p>
                                     <p className="text-sm text-slate-200 mt-1">
-                                        {userRole === "tutor" ? "Tutor account" : "Student account"}
+                                        {userRole === "tutor"
+                                            ? "Tutor account"
+                                            : userRole === "admin"
+                                                ? "Admin account"
+                                                : "Student account"}
                                     </p>
                                 </div>
 
@@ -394,17 +408,17 @@ function StudentDashboard() {
                         </div>
                     </section>
 
-                    {/* Non-student notice (just in case) */}
-                    {!isStudent && (
+                    {/* Non-student notice (just in case – should rarely show due to redirect) */}
+                    {!isStudent && isAuthenticated && (
                         <div className="rounded-2xl border border-amber-600/70 bg-amber-900/30 px-4 py-3 text-xs text-amber-100">
                             You are logged in as <span className="font-semibold">{userRole}</span>.
-                            This page is styled for students – later we can build a dedicated tutor dashboard.
+                            This page is styled for students – you&apos;ll be redirected to your own dashboard.
                         </div>
                     )}
                 </div>
             </main>
 
-            {/* FOOTER – optional, match App if you like */}
+            {/* FOOTER */}
             <footer className="px-4 py-4 border-t border-slate-800 text-xs text-slate-400 text-center relative z-10">
                 © {new Date().getFullYear()} Sumit. All rights reserved.
             </footer>
