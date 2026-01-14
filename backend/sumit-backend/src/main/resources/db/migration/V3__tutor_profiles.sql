@@ -9,16 +9,16 @@ CREATE TABLE town (
     province_id INTEGER REFERENCES province(id)
 );
 
-INSERT INTO province (name) VALUES ('western cape');
-INSERT INTO town (name, province_id) VALUES ('durbanville', 1);
-INSERT INTO town (name, province_id) VALUES ('stellenbosch', 1);
+INSERT INTO province (name) VALUES ('WESTERN_CAPE');
+INSERT INTO town (name, province_id) VALUES ('DURBANVILLE', 1);
+INSERT INTO town (name, province_id) VALUES ('STELLENBOSCH', 1);
 
 CREATE TABLE subjects (
     id SERIAL PRIMARY KEY,
     name VARCHAR(25) NOT NULL
 );
 
-INSERT INTO subjects (name) VALUES ('mathematics'), ('physics'), ('accounting');
+INSERT INTO subjects (name) VALUES ('MATHEMATICS');
 
 CREATE TABLE grades (
     id SERIAL PRIMARY KEY,
@@ -30,7 +30,7 @@ CREATE TABLE languages (
     language VARCHAR(25) NOT NULL UNIQUE
 );
 
-INSERT INTO languages (language) VALUES ('english'), ('afrikaans');
+INSERT INTO languages (language) VALUES ('ENGLISH');
 
 INSERT INTO grades (grade) VALUES (8), (9), (10), (11), (12);
 
@@ -40,13 +40,13 @@ CREATE TABLE tutors (
     teaching_experience text,
     status VARCHAR(25) NOT NULL,
     language_id INTEGER NOT NULL REFERENCES languages(id),
-    CHECK (status IN ('pending', 'accepted', 'rejected', 'withdrawn')),
+    CHECK (status IN ('PENDING', 'ACCEPTED', 'REJECTED', 'WITHDRAWN')),
     rejected_reason text,
     user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
     town_id INTEGER REFERENCES town(id) ON DELETE RESTRICT,
-    created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     reviewed BOOLEAN NOT NULL DEFAULT FALSE,
-    reviewed_at TIMESTAMP
+    reviewed_at TIMESTAMPTZ
 );
 
 CREATE INDEX idx_tutor_status ON tutors (status) WHERE status = 'pending';

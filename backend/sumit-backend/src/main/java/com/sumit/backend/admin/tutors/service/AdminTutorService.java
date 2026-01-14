@@ -11,7 +11,7 @@ import jakarta.transaction.Transactional;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 
 @Service
 public class AdminTutorService {
@@ -24,15 +24,15 @@ public class AdminTutorService {
     @Transactional
     public void acceptTutorApplicant(Integer id) {
         Tutor tutor = tutorRepository.findById(id).orElseThrow(() -> new RuntimeException("Tutor not found: " + id));
-        if (tutor.getStatus() != Status.pending) {
+        if (tutor.getStatus() != Status.PENDING) {
             throw new RuntimeException("Tutor not pending anymore");
         }
-        tutor.setStatus(Status.accepted);
+        tutor.setStatus(Status.ACCEPTED);
         Integer userId = tutor.getUserId();
         tutor.setReviewed(true);
-        tutor.setReviewedAt(LocalDateTime.now());
+        tutor.setReviewedAt(Instant.now());
         User user = userRepository.findById(userId).orElseThrow(() -> new RuntimeException("User not found: " + userId));
-        user.setRole(Role.tutor);
+        user.setRole(Role.TUTOR);
         tutorRepository.save(tutor);
         userRepository.save(user);
     }
@@ -40,13 +40,13 @@ public class AdminTutorService {
     @Transactional
     public void rejectTutorApplicant(Integer id, RejectApplicantDTO rejectApplicantDTO) {
         Tutor tutor = tutorRepository.findById(id).orElseThrow(() -> new RuntimeException("Tutor not found: " + id));
-        if (tutor.getStatus() != Status.pending) {
+        if (tutor.getStatus() != Status.PENDING) {
             throw new RuntimeException("Tutor not pending anymore");
         }
-        tutor.setStatus(Status.rejected);
+        tutor.setStatus(Status.REJECTED);
         tutor.setRejectedReason(rejectApplicantDTO.getReason());
         tutor.setReviewed(true);
-        tutor.setReviewedAt(LocalDateTime.now());
+        tutor.setReviewedAt(Instant.now());
         tutorRepository.save(tutor);
     }
 }

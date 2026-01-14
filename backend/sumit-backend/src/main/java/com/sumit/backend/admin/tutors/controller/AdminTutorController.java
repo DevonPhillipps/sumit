@@ -22,20 +22,20 @@ public class AdminTutorController {
     AdminTutorService adminTutorService;
 
     @GetMapping("/view-pending-tutor-applicants")
-    @PreAuthorize("hasRole('admin')")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<List<AdminTutorViewDTO>> viewTutorApplicants(){
         return ResponseEntity.ok(tutorService.getAllPendingTutors());
     }
 
     @PostMapping("/{id}/accept")
-    @PreAuthorize("hasRole('admin')")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Void> acceptTutorApplicant(@PathVariable Integer id) {
         adminTutorService.acceptTutorApplicant(id);
         return ResponseEntity.noContent().build(); //empty response
     }
 
     @PostMapping("/{id}/reject")
-    @PreAuthorize("hasRole('admin')")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Void> rejectTutorApplicant(@PathVariable Integer id, @RequestBody RejectApplicantDTO rejectApplicantDTO) {
         adminTutorService.rejectTutorApplicant(id, rejectApplicantDTO);
         return ResponseEntity.noContent().build();

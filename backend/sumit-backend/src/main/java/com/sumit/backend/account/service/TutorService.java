@@ -1,12 +1,23 @@
 package com.sumit.backend.account.service;
 
 import com.sumit.backend.account.dto.BecomeATutorDTO;
-import com.sumit.backend.account.dto.SubjectDTO;
-import com.sumit.backend.account.dto.TownDTO;
+import com.sumit.backend.reference.academics.grades.entity.Grade;
+import com.sumit.backend.reference.academics.grades.repository.GradeRepository;
+import com.sumit.backend.reference.academics.subjects.dto.SubjectDTO;
 import com.sumit.backend.account.dto.TutorApplicationResponse;
 import com.sumit.backend.account.entity.*;
 import com.sumit.backend.account.repository.*;
 import com.sumit.backend.admin.tutors.dto.AdminTutorViewDTO;
+import com.sumit.backend.location.repository.ProvinceRepository;
+import com.sumit.backend.location.repository.TownRepository;
+import com.sumit.backend.reference.academics.subjects.entity.Subject;
+import com.sumit.backend.reference.academics.subjects.repository.SubjectRepository;
+import com.sumit.backend.reference.language.entity.Language;
+import com.sumit.backend.reference.language.repository.LanguageRepository;
+import com.sumit.backend.teaching.academic_offers.entity.Combo;
+import com.sumit.backend.teaching.academic_offers.entity.TutorSubjectOffers;
+import com.sumit.backend.teaching.academic_offers.repository.ComboRepository;
+import com.sumit.backend.teaching.academic_offers.repository.TutorSubjectOffersRepository;
 import jakarta.transaction.Transactional;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -44,19 +55,20 @@ public class TutorService {
     @Autowired
     private LanguageRepository languageRepository;
 
+    public Integer getTutorIdByUserId(Integer userId){
+        Tutor tutor = tutorRepository.findByUserId(userId).orElseThrow(() -> new RuntimeException("User not found"));
+        return tutor.getId();
+    }
+
     @Transactional
     public TutorApplicationResponse BecomeATutor(BecomeATutorDTO becomeATutorDTO, Integer userId) {
         Tutor tutor = new Tutor();
-        TownDTO townDto = becomeATutorDTO.getTown();
-        String town = townDto.getTown();
-        Optional<Town> townId = townRepository.findByNameIgnoreCase(town);
-        String languageStr = becomeATutorDTO.getPreferredLanguage().getLanguage();
-        Optional<Language> language = languageRepository.findByNameIgnoreCase(languageStr);
-        Integer languageId = language.get().getId();
+        Integer townId = becomeATutorDTO.getTown().getId();
+        Integer languageId = becomeATutorDTO.getPreferredLanguage().getId();
 
         User user = userRepository.findById(userId).orElseThrow(() -> new RuntimeException("User not found"));
         Role role = user.getRole();
-        if (role != Role.student) {
+        if (role != Role.STUDENT) {
             throw new RuntimeException("User is not a student");
         }
 
@@ -66,35 +78,23 @@ public class TutorService {
             return response;
         }
 
-        if (town == null) {
+        if (townId == null) {
             return new TutorApplicationResponse("No town", null, "Rejected");
         }
-        if (!townRepository.existsByNameIgnoreCase(town)) {
-            return new TutorApplicationResponse("Invalid town", null, "Rejected");
-        }
-
-        if (townId.isEmpty()) {
-            return new TutorApplicationResponse("Invalid town", null, "Rejected");
-        }
-
-        if (language.isEmpty()) {
-            return new TutorApplicationResponse("Invalid language", null, "Rejected");
-        }
-
 
         if (tutorRepository.existsByUserId(userId)) {
             Tutor existingTutor = tutorRepository.findByUserId(userId).get();
-            if (existingTutor.getStatus() == Status.pending) {
+            if (existingTutor.getStatus() == Status.PENDING) {
                 return new TutorApplicationResponse("Already applied", null, "Rejected");
-            } else if (existingTutor.getStatus() == Status.accepted) {
+            } else if (existingTutor.getStatus() == Status.ACCEPTED) {
                 return new TutorApplicationResponse("Already approved", null, "Rejected");
-            } else if (existingTutor.getStatus() == Status.rejected) {
+            } else if (existingTutor.getStatus() == Status.REJECTED) {
                 return new TutorApplicationResponse("Already rejected", null, existingTutor.getStatus().toString());
             } else {
                 existingTutor.setAge(age);
-                existingTutor.setStatus(Status.pending);
+                existingTutor.setStatus(Status.PENDING);
                 existingTutor.setTeachingExperience(becomeATutorDTO.getTeachingExperience());
-                existingTutor.setTownId(townId.get().getId());
+                existingTutor.setTownId(townId);
                 existingTutor.setPreferredLanguageId(languageId);
                 tutorRepository.save(existingTutor);
                 TutorApplicationResponse response = new TutorApplicationResponse("Application sent", existingTutor.getId(), "Pending");
@@ -103,10 +103,10 @@ public class TutorService {
         }
 
         tutor.setAge(age);
-        tutor.setStatus(Status.pending);
+        tutor.setStatus(Status.PENDING);
         tutor.setUserId(userId);
         tutor.setTeachingExperience(becomeATutorDTO.getTeachingExperience());
-        tutor.setTownId(townId.get().getId());
+        tutor.setTownId(townId);
         tutor.setPreferredLanguageId(languageId);
         tutorRepository.save(tutor);
 
@@ -116,14 +116,14 @@ public class TutorService {
                 if (!gradeRepository.existsByGrade(grade)) {
                     return new TutorApplicationResponse("Invalid grade", null, "Rejected");
                 }
-                if (!subjectRepository.existsByNameIgnoreCase(subject.getSubject())) {
+                if (!subjectRepository.existsByNameIgnoreCase(subject.getName())) {
                     return new TutorApplicationResponse("Invalid subject", null, "Rejected");
                 }
 
                 Integer gradeId = gradeRepository.findByGrade(grade).get().getId();
-                Integer subjectId = subjectRepository.findByNameIgnoreCase(subject.getSubject()).get().getId();
+                Integer subjectId = subjectRepository.findByNameIgnoreCase(subject.getName()).get().getId();
 
-                Combo combo = comboRepository.findByGradeIdAndSubjectIdAndLanguageIdAndTownId(gradeId, subjectId, languageId, townId.get().getId())
+                Combo combo = comboRepository.findByGradeIdAndSubjectIdAndLanguageIdAndTownId(gradeId, subjectId, languageId, townId)
                         .orElse(null);
 
                 if (combo == null) {
@@ -143,7 +143,7 @@ public class TutorService {
     }
 
     public List<AdminTutorViewDTO> getAllPendingTutors() {
-        List<Tutor> pendingTutors = tutorRepository.findByStatus(Status.pending);
+        List<Tutor> pendingTutors = tutorRepository.findByStatus(Status.PENDING);
         List<AdminTutorViewDTO> adminTutorViewDTOList = new ArrayList<>();
 
 
@@ -182,8 +182,7 @@ public class TutorService {
                 SubjectDTO subjectDTO = subjectMap.get(subjectName);
                 if (subjectDTO == null) {
                     subjectDTO = new SubjectDTO();
-                    subjectDTO.setSubject(subjectName);
-                    subjectDTO.setMark(null); // not stored anywhere in DB
+                    subjectDTO.setName(subjectName);
                     subjectDTO.setGrades(new ArrayList<>());
                     subjectMap.put(subjectName, subjectDTO);
                 }
@@ -198,7 +197,7 @@ public class TutorService {
             for (SubjectDTO s : subjects) {
                 s.getGrades().sort(Integer::compareTo);
             }
-            subjects.sort((a, b) -> a.getSubject().compareToIgnoreCase(b.getSubject()));
+            subjects.sort((a, b) -> a.getName().compareToIgnoreCase(b.getName()));
 
             dto.setSubjects(subjects);
 
@@ -207,5 +206,4 @@ public class TutorService {
 
         return adminTutorViewDTOList;
     }
-
 }

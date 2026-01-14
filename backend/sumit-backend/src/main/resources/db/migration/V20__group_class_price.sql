@@ -1,0 +1,1 @@
+ALTER TABLE group_classes ADD COLUMN price NUMERIC(10, 2) NOT NULL CHECK (price >= 0.00);

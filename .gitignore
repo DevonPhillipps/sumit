@@ -1,91 +1,41 @@
-### this was fully made by ai. im not that guy that is gonna make this shit myself lol
-### Java/Spring Boot ###
+### Java / Spring Boot ###
 target/
 *.class
 *.jar
 *.war
-.mvn/
-mvnw
-mvnw.cmd
-!mvnw.cmd
 
-### PostgreSQL ###
-*.dump
-*.backup
-
-### Flyway ###
-flyway.conf
-flyway-*.conf
-
-### Node.js/React/TypeScript/Vite ###
+### Node / React / Vite ###
 node_modules/
+dist/
+dist-ssr/
+.cache/
+.temp/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
-dist/
-dist-ssr/
-*.local
 
-# Vite
-.cache/
-.temp/
-
-# TypeScript
+### TypeScript ###
 *.tsbuildinfo
 
-# Tailwind CSS
-.tailwindcss
-
-### IntelliJ IDEA ###
+### IDE ###
 .idea/
 *.iml
 *.iws
 *.ipr
-*.swp
-*.swo
-
-# VS Code (if you use it)
 .vscode/
-!.vscode/settings.json
-!.vscode/tasks.json
-!.vscode/launch.json
-!.vscode/extensions.json
 
-### Environment Variables ###
-.env
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
-.env*.local
-
-# Spring Boot application properties
-application.properties
-application-*.properties
-
-# JWT secrets/keys
-*.jks
-*.p12
+### Env / Secrets ###
+.env.docker
+.env.*
+*.local
 *.pem
+*.p12
+*.jks
+!.env.example
 
-### Database Files ###
-*.db
-*.sqlite
-*.h2.db
-
-### Build Outputs ###
-build/
-out/
-.next/
-
-### OS Files ###
+### OS ###
 .DS_Store
-.DS_Store?
-._*
-.Spotlight-V100
-.Trashes
-ehthumbs.db
 Thumbs.db
 
 ### Logs ###

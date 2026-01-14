@@ -1,8 +1,9 @@
 package com.sumit.backend.admin.tutors.dto;
 
-import com.sumit.backend.account.dto.SubjectDTO;
+import com.sumit.backend.reference.academics.subjects.dto.SubjectDTO;
 import com.sumit.backend.account.entity.Status;
 
+import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -17,9 +18,9 @@ public class AdminTutorViewDTO {
     private String preferredLanguage;
     private String rejectedReason = null;
     private String town;
-    private LocalDateTime createdAt;
+    private Instant createdAt;
     private Boolean reviewed = false;
-    private LocalDateTime reviewedAt;
+    private Instant reviewedAt;
     private List<SubjectDTO> subjects;
 
     public AdminTutorViewDTO() {
@@ -105,11 +106,11 @@ public class AdminTutorViewDTO {
         this.rejectedReason = rejectedReason;
     }
 
-    public LocalDateTime getCreatedAt() {
+    public Instant getCreatedAt() {
         return createdAt;
     }
 
-    public void setCreatedAt(LocalDateTime createdAt) {
+    public void setCreatedAt(Instant createdAt) {
         this.createdAt = createdAt;
     }
 
@@ -121,11 +122,11 @@ public class AdminTutorViewDTO {
         this.reviewed = reviewed;
     }
 
-    public LocalDateTime getReviewedAt() {
+    public Instant getReviewedAt() {
         return reviewedAt;
     }
 
-    public void setReviewedAt(LocalDateTime reviewedAt) {
+    public void setReviewedAt(Instant reviewedAt) {
         this.reviewedAt = reviewedAt;
     }
 

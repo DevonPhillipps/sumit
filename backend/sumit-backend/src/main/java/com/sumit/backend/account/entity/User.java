@@ -4,6 +4,7 @@ import jakarta.persistence.*;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
+import java.time.Instant;
 import java.time.LocalDateTime;
 
 @Entity
@@ -36,14 +37,17 @@ public class User {
     @Column(name = "role", length=20)
     private Role role;
 
+    @Column(name="free_lessons_available", nullable = false)
+    private short freeLessonsAvailable;
+
 
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
-    private LocalDateTime createdAt;
+    private Instant createdAt;
 
     @UpdateTimestamp
     @Column(name = "updated_at", nullable = false)
-    private LocalDateTime updatedAt;
+    private Instant updatedAt;
 
     public User() {
     }
@@ -101,11 +105,11 @@ public class User {
         this.profilePictureUrl = profilePictureUrl;
     }
 
-    public LocalDateTime getCreatedAt() {
+    public Instant getCreatedAt() {
         return createdAt;
     }
 
-    public LocalDateTime getUpdatedAt() {
+    public Instant getUpdatedAt() {
         return updatedAt;
     }
 
@@ -115,5 +119,13 @@ public class User {
 
     public void setRole(Role role) {
         this.role = role;
+    }
+
+    public short getFreeLessonsAvailable() {
+        return freeLessonsAvailable;
+    }
+
+    public void setFreeLessonsAvailable(short freeLessonsAvailable) {
+        this.freeLessonsAvailable = freeLessonsAvailable;
     }
 }

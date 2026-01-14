@@ -46,9 +46,10 @@ public class AuthService {
         newUser.setPhoneNumber(signUpDTO.getPhoneNumber());
         newUser.setFirstName(signUpDTO.getFirstName());
         newUser.setSurname(signUpDTO.getSurname());
+        newUser.setFreeLessonsAvailable((short) 1);
 
         // Use DTO role or default to student
-        Role role = (signUpDTO.getRole() != null) ? signUpDTO.getRole() : Role.student;
+        Role role = (signUpDTO.getRole() != null) ? signUpDTO.getRole() : Role.STUDENT;
         newUser.setRole(role);
 
         userRepository.save(newUser);

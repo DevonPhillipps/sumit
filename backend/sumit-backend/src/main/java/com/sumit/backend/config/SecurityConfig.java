@@ -41,6 +41,10 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/api/auth/**").permitAll()
                         .requestMatchers("/error").permitAll()
+                        .requestMatchers("/api/location/**").permitAll() //todo DONT PERMIT ALL CHANGE BEFORE LAUNCH
+                        .requestMatchers("/api/reference/**").permitAll()
+                        .requestMatchers("/api/teaching/**").permitAll()
+                        .requestMatchers("/api/**").permitAll()
                         .anyRequest().authenticated()
                 )
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);

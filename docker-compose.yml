@@ -1,0 +1,42 @@
+services:
+  db:
+    image: postgres:16
+    container_name: sumit-db
+    env_file: .env.docker
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    ports:
+      - "5432:5432"   # keep for dev; remove on EC2 later
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  backend:
+    build:
+      context: ./backend/sumit-backend
+      dockerfile: Dockerfile
+    container_name: sumit-backend
+    depends_on:
+      db:
+        condition: service_healthy
+    env_file: .env.docker
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      # The docker profile uses POSTGRES_* directly now
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_EXPIRATION: ${JWT_EXPIRATION}
+      JWT_REFRESH_EXPIRATION: ${JWT_REFRESH_EXPIRATION}
+    ports:
+      - "8080:8080"
+
+volumes:
+  pgdata:

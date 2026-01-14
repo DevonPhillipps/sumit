@@ -1,17 +1,34 @@
-import {useEffect, useState} from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
-type Role = "student" | "tutor" | "admin";
+type RoleUpper = "STUDENT" | "TUTOR" | "ADMIN";
+type RoleLower = "student" | "tutor" | "admin";
+
+function normalizeRole(raw: unknown): RoleUpper {
+    const s = String(raw ?? "").trim();
+    const up = s.toUpperCase();
+    if (up === "STUDENT" || up === "TUTOR" || up === "ADMIN") return up as RoleUpper;
+    return "STUDENT";
+}
+
+function roleToPath(role: RoleUpper): RoleLower {
+    if (role === "TUTOR") return "tutor";
+    if (role === "ADMIN") return "admin";
+    return "student";
+}
 
 function TutorDashboard() {
     const navigate = useNavigate();
     const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
 
     const token = localStorage.getItem("token");
-    const storedRole = (localStorage.getItem("userRole") || "tutor") as Role;
+
+    // localStorage may still have old lowercase values, or new uppercase values
+    const storedRoleUpper = useMemo(() => normalizeRole(localStorage.getItem("userRole")), []);
+    const storedRoleLabel = storedRoleUpper; // display "TUTOR"/etc. (or map to nicer text if you want)
+
     const isAuthenticated = !!token;
 
-    // 🔒 ROLE CHECK (BACKEND) – COMMENTED OUT FOR NOW
     useEffect(() => {
         const verifyRole = async () => {
             const token = localStorage.getItem("token");
@@ -24,7 +41,7 @@ function TutorDashboard() {
                 const res = await fetch("http://localhost:8080/api/auth/role", {
                     method: "GET",
                     headers: {
-                        "Authorization": `Bearer ${token}`,
+                        Authorization: `Bearer ${token}`,
                     },
                 });
 
@@ -33,20 +50,15 @@ function TutorDashboard() {
                     return;
                 }
 
-                const role: Role = await res.json();
+                // backend now returns uppercase enum string
+                const raw = await res.json();
+                const roleUpper = normalizeRole(raw);
 
-                if (role === "tutor") {
-                    // OK – stay on tutor dashboard
-                    return;
-                }
+                if (roleUpper === "TUTOR") return;
 
-                if (role === "admin") {
-                    navigate("/dashboard/admin", { replace: true });
-                } else if (role === "student") {
-                    navigate("/dashboard/student", { replace: true });
-                } else {
-                    navigate("/login", { replace: true });
-                }
+                if (roleUpper === "ADMIN") navigate("/dashboard/admin", { replace: true });
+                else if (roleUpper === "STUDENT") navigate("/dashboard/student", { replace: true });
+                else navigate("/login", { replace: true });
             } catch (e) {
                 console.error("Error verifying role", e);
                 navigate("/login", { replace: true });
@@ -64,22 +76,16 @@ function TutorDashboard() {
         navigate("/login");
     };
 
-    const toggleProfileMenu = () => {
-        setIsProfileMenuOpen((prev) => !prev);
-    };
+    const toggleProfileMenu = () => setIsProfileMenuOpen((prev) => !prev);
 
-    const handleLogoClick = () => {
-        navigate("/dashboard/tutor");
-    };
+    // keep routes lowercase even if role enums are uppercase
+    const handleLogoClick = () => navigate(`/dashboard/${roleToPath(storedRoleUpper)}`);
 
     return (
         <div className="min-h-screen flex flex-col bg-slate-950 text-slate-100 overflow-x-hidden">
             {/* HEADER */}
             <header className="border-b border-slate-800 px-4 py-3 flex items-center justify-between relative z-20 bg-slate-950/80 backdrop-blur">
-                <div
-                    className="font-semibold text-lg tracking-tight cursor-pointer"
-                    onClick={handleLogoClick}
-                >
+                <div className="font-semibold text-lg tracking-tight cursor-pointer" onClick={handleLogoClick}>
                     Sumit
                 </div>
 
@@ -105,12 +111,7 @@ function TutorDashboard() {
                             className="flex items-center gap-2 px-2 py-1 rounded-full border border-slate-700 bg-slate-900/80 hover:border-sky-500 transition"
                         >
                             <div className="h-8 w-8 rounded-full bg-sky-500/90 flex items-center justify-center text-xs font-semibold text-black">
-                                <svg
-                                    className="h-4 w-4"
-                                    viewBox="0 0 24 24"
-                                    fill="none"
-                                    stroke="currentColor"
-                                >
+                                <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor">
                                     <path
                                         d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4z"
                                         strokeWidth="1.8"
@@ -126,39 +127,24 @@ function TutorDashboard() {
                                 </svg>
                             </div>
                             <div className="hidden sm:flex flex-col items-start">
-                            <span className="text-xs uppercase tracking-wide text-slate-400">
-                                Signed in as
-                            </span>
-                                <span className="text-xs font-medium text-slate-100">
-                                {storedRole}
-                            </span>
+                                <span className="text-xs uppercase tracking-wide text-slate-400">Signed in as</span>
+                                <span className="text-xs font-medium text-slate-100">{storedRoleLabel}</span>
                             </div>
                             <svg
-                                className={`h-4 w-4 text-slate-400 transition-transform ${
-                                    isProfileMenuOpen ? "rotate-180" : ""
-                                }`}
+                                className={`h-4 w-4 text-slate-400 transition-transform ${isProfileMenuOpen ? "rotate-180" : ""}`}
                                 viewBox="0 0 24 24"
                                 fill="none"
                                 stroke="currentColor"
                             >
-                                <path
-                                    d="M6 9l6 6 6-6"
-                                    strokeWidth="1.8"
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                />
+                                <path d="M6 9l6 6 6-6" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
                             </svg>
                         </button>
 
                         {isProfileMenuOpen && (
                             <div className="absolute right-0 mt-2 w-64 rounded-2xl bg-slate-900 border border-slate-800 shadow-xl shadow-slate-950/70 py-2 z-30">
                                 <div className="px-4 pb-2">
-                                    <p className="text-xs uppercase tracking-wide text-slate-500">
-                                        Account
-                                    </p>
-                                    <p className="text-sm text-slate-200 mt-1">
-                                        Tutor account
-                                    </p>
+                                    <p className="text-xs uppercase tracking-wide text-slate-500">Account</p>
+                                    <p className="text-sm text-slate-200 mt-1">Tutor account</p>
                                 </div>
 
                                 <button
@@ -179,6 +165,17 @@ function TutorDashboard() {
                                     }}
                                 >
                                     Tutor dashboard
+                                </button>
+
+                                {/* ✅ NEW */}
+                                <button
+                                    className="w-full text-left px-4 py-2 text-sm text-slate-200 hover:bg-slate-800/80 transition"
+                                    onClick={() => {
+                                        setIsProfileMenuOpen(false);
+                                        navigate("/dashboard/tutor/my-classes");
+                                    }}
+                                >
+                                    My classes
                                 </button>
 
                                 <div className="my-1 border-t border-slate-800" />
@@ -206,92 +203,46 @@ function TutorDashboard() {
                 <div className="relative z-10 max-w-6xl mx-auto space-y-8">
                     <section className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                         <div>
-                            <h1 className="text-2xl md:text-3xl font-semibold tracking-tight">
-                                Tutor Dashboard
-                            </h1>
-                            <p className="text-sm text-slate-400 mt-1">
-                                See your upcoming classes and manage your schedule.
-                            </p>
-                        </div>
-                        <button
-                            className="self-start px-4 py-2 rounded-full bg-sky-500 hover:bg-sky-400 text-black text-sm font-semibold shadow-lg shadow-sky-500/30 transition"
-                            onClick={() => alert("Create class coming soon")}
-                        >
-                            + Create new class
-                        </button>
-                    </section>
-
-                    <section className="grid gap-4 md:grid-cols-3">
-                        <div className="rounded-3xl border border-slate-800/70 bg-slate-900/80 px-5 py-4 shadow-lg shadow-slate-950/70">
-                            <p className="text-xs uppercase tracking-wide text-slate-400">
-                                This week
-                            </p>
-                            <p className="text-2xl font-semibold mt-1">5</p>
-                            <p className="text-xs text-slate-500 mt-1">
-                                scheduled sessions
-                            </p>
+                            <h1 className="text-2xl md:text-3xl font-semibold tracking-tight">Tutor Dashboard</h1>
+                            <p className="text-sm text-slate-400 mt-1">See your upcoming classes and manage your schedule.</p>
                         </div>
 
-                        <div className="rounded-3xl border border-slate-800/70 bg-slate-900/80 px-5 py-4 shadow-lg shadow-slate-950/70">
-                            <p className="text-xs uppercase tracking-wide text-slate-400">
-                                Active students
-                            </p>
-                            <p className="text-2xl font-semibold mt-1">12</p>
-                            <p className="text-xs text-slate-500 mt-1">
-                                across all your classes
-                            </p>
-                        </div>
-
-                        <div className="rounded-3xl border border-slate-800/70 bg-slate-900/80 px-5 py-4 shadow-lg shadow-slate-950/70">
-                            <p className="text-xs uppercase tracking-wide text-slate-400">
-                                Next session
-                            </p>
-                            <p className="text-sm font-medium mt-1 text-sky-400">
-                                Maths Gr 11 · Today 16:00
-                            </p>
-                            <p className="text-xs text-slate-500 mt-1">
-                                Online · Google Meet
-                            </p>
-                        </div>
-                    </section>
-
-                    <section className="rounded-3xl border border-slate-800/70 bg-slate-900/80 px-5 py-5 shadow-lg shadow-slate-950/70">
-                        <div className="flex items-center justify-between mb-4">
-                            <h2 className="text-sm font-semibold text-slate-100">
-                                Today&apos;s sessions
-                            </h2>
+                        <div className="flex flex-col sm:flex-row gap-3">
                             <button
-                                className="text-xs text-sky-400 hover:text-sky-300 transition"
-                                onClick={() => alert("Sessions list coming soon")}
+                                className="px-4 py-2 rounded-full border border-slate-700 hover:border-sky-500 bg-slate-900/70 text-slate-100 text-sm font-semibold transition"
+                                onClick={() => navigate("/dashboard/tutor/my-classes")}
                             >
-                                View schedule
+                                My classes
+                            </button>
+
+                            <button
+                                className="px-4 py-2 rounded-full bg-sky-500 hover:bg-sky-400 text-black text-sm font-semibold shadow-lg shadow-sky-500/30 transition"
+                                onClick={() => navigate("/tutor/create-class")}
+                            >
+                                + Create new class
                             </button>
                         </div>
+                    </section>
 
-                        <ul className="space-y-3 text-sm">
-                            <li className="rounded-2xl border border-slate-800 bg-slate-900/90 px-4 py-3">
-                                <p className="font-medium text-slate-100">
-                                    Mathematics Grade 11
-                                </p>
-                                <p className="text-xs text-slate-400 mt-0.5">
-                                    16:00–17:00 · Online · Google Meet
-                                </p>
-                                <p className="text-xs text-slate-400 mt-0.5">
-                                    Students: <span className="text-sky-400">4</span>
-                                </p>
-                            </li>
-                            <li className="rounded-2xl border border-slate-800 bg-slate-900/90 px-4 py-3">
-                                <p className="font-medium text-slate-100">
-                                    Physical Science Grade 12
-                                </p>
-                                <p className="text-xs text-slate-400 mt-0.5">
-                                    18:00–19:30 · Stellenbosch Library
-                                </p>
-                                <p className="text-xs text-slate-400 mt-0.5">
-                                    Students: <span className="text-sky-400">3</span>
-                                </p>
-                            </li>
-                        </ul>
+                    {/* the rest of your dashboard stays the same */}
+                    <section className="grid gap-4 md:grid-cols-3">
+                        <div className="rounded-3xl border border-slate-800/70 bg-slate-900/80 px-5 py-4 shadow-lg shadow-slate-950/70">
+                            <p className="text-xs uppercase tracking-wide text-slate-400">This week</p>
+                            <p className="text-2xl font-semibold mt-1">5</p>
+                            <p className="text-xs text-slate-500 mt-1">scheduled sessions</p>
+                        </div>
+
+                        <div className="rounded-3xl border border-slate-800/70 bg-slate-900/80 px-5 py-4 shadow-lg shadow-slate-950/70">
+                            <p className="text-xs uppercase tracking-wide text-slate-400">Active students</p>
+                            <p className="text-2xl font-semibold mt-1">12</p>
+                            <p className="text-xs text-slate-500 mt-1">across all your classes</p>
+                        </div>
+
+                        <div className="rounded-3xl border border-slate-800/70 bg-slate-900/80 px-5 py-4 shadow-lg shadow-slate-950/70">
+                            <p className="text-xs uppercase tracking-wide text-slate-400">Next session</p>
+                            <p className="text-sm font-medium mt-1 text-sky-400">Maths Gr 11 · Today 16:00</p>
+                            <p className="text-xs text-slate-500 mt-1">Online · Google Meet</p>
+                        </div>
                     </section>
                 </div>
             </main>

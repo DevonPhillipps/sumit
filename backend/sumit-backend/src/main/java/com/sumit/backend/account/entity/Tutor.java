@@ -3,7 +3,7 @@ package com.sumit.backend.account.entity;
 import jakarta.persistence.*;
 import org.hibernate.annotations.CreationTimestamp;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 
 @Entity
 @Table(name="tutors")
@@ -36,13 +36,13 @@ public class Tutor {
 
     @CreationTimestamp
     @Column(name="created_at", nullable = false, updatable = false)
-    private LocalDateTime createdAt;
+    private Instant createdAt;
 
     @Column(name="reviewed", nullable = false)
     private Boolean reviewed = false;
 
     @Column(name="reviewed_at")
-    private LocalDateTime reviewedAt;
+    private Instant reviewedAt;
 
     public Tutor() {
     }
@@ -111,11 +111,11 @@ public class Tutor {
         this.townId = townId;
     }
 
-    public LocalDateTime getCreatedAt() {
+    public Instant getCreatedAt() {
         return createdAt;
     }
 
-    public void setCreatedAt(LocalDateTime createdAt) {
+    public void setCreatedAt(Instant createdAt) {
         this.createdAt = createdAt;
     }
 
@@ -127,11 +127,11 @@ public class Tutor {
         this.reviewed = reviewed;
     }
 
-    public LocalDateTime getReviewedAt() {
+    public Instant getReviewedAt() {
         return reviewedAt;
     }
 
-    public void setReviewedAt(LocalDateTime reviewedAt) {
+    public void setReviewedAt(Instant reviewedAt) {
         this.reviewedAt = reviewedAt;
     }
 }

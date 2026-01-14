@@ -8,7 +8,7 @@ public class SignUpDTO {
     private String email;
     private String password;
     private String phoneNumber;
-    private Role role = Role.student;
+    private Role role = Role.STUDENT;
 
     public String getFirstName() {
         return firstName;

@@ -1,0 +1,1 @@
+ALTER TABLE group_classes ADD COLUMN start_date DATE NOT NULL;

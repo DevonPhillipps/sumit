@@ -21,7 +21,7 @@ public class TutorController {
     TutorService tutorService;
 
     @PostMapping("/become-a-tutor")
-    @PreAuthorize("hasRole('student')")
+    @PreAuthorize("hasRole('STUDENT')")
     public ResponseEntity<TutorApplicationResponse> becomeATutor(@RequestBody BecomeATutorDTO becomeATutorDTO, @AuthenticationPrincipal UserDetails userDetails){
         Integer userId = Integer.parseInt(userDetails.getUsername());
         TutorApplicationResponse response = tutorService.BecomeATutor(becomeATutorDTO, userId);

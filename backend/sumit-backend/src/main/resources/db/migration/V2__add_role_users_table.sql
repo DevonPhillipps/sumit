@@ -1,8 +1,8 @@
 ALTER TABLE users
-ADD COLUMN role VARCHAR(20) DEFAULT 'student';
+ADD COLUMN role VARCHAR(20) DEFAULT 'STUDENT';
 
 ALTER TABLE users
-ADD CONSTRAINT check_role CHECK (role IN ('student', 'tutor', 'admin'));
+ADD CONSTRAINT check_role CHECK (role IN ('STUDENT', 'TUTOR', 'ADMIN'));
 
 ALTER TABLE users
 DROP COLUMN bio

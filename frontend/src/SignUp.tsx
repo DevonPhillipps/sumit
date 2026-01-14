@@ -1,10 +1,12 @@
 import { useNavigate } from "react-router-dom";
 import { useState } from "react";
 
+type RoleUpper = "STUDENT" | "TUTOR" | "ADMIN";
+
 interface JwtResponse {
     token: string;
     userId: number;
-    role: string; // "student" | "tutor" | "admin"
+    role: RoleUpper; // backend now returns uppercase
 }
 
 function SignUp() {
@@ -16,7 +18,7 @@ function SignUp() {
         phoneNumber: "",
         password: "",
         confirmPassword: "",
-        role: "student",
+        role: "STUDENT" as RoleUpper, // default uppercase
     });
     const [isLoading, setIsLoading] = useState(false);
     const [showPassword, setShowPassword] = useState(false);
@@ -26,6 +28,7 @@ function SignUp() {
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const { name, value } = e.target;
+
         setFormData((prev) => ({
             ...prev,
             [name]: value,
@@ -64,7 +67,7 @@ function SignUp() {
             const signupData = {
                 ...dataToSend,
                 phoneNumber,
-                role: "student", // enforce student for now
+                role: "STUDENT" as RoleUpper, // enforce student for now (UPPERCASE)
             };
 
             const response = await fetch("http://localhost:8080/api/auth/signup", {
@@ -79,31 +82,26 @@ function SignUp() {
                 const jwtResponse: JwtResponse = await response.json();
                 console.log("Signup successful!", jwtResponse);
 
-                // Auto-login: store auth info
+                // Store auth info (uppercase role)
                 localStorage.setItem("token", jwtResponse.token);
                 localStorage.setItem("userId", jwtResponse.userId.toString());
                 localStorage.setItem("userRole", jwtResponse.role);
 
-                // Redirect straight to correct dashboard
-                navigate(`/dashboard/${jwtResponse.role}`, { replace: true });
+
+                navigate(`/dashboard/${jwtResponse.role.toLowerCase()}`, { replace: true });
+
             } else {
                 const responseText = await response.text();
                 try {
                     const errorData = JSON.parse(responseText);
-                    setErrorMessage(
-                        errorData.error || `Signup failed: ${response.statusText}`
-                    );
+                    setErrorMessage(errorData.error || `Signup failed: ${response.statusText}`);
                 } catch {
-                    setErrorMessage(
-                        `Signup failed: ${response.statusText || responseText}`
-                    );
+                    setErrorMessage(`Signup failed: ${response.statusText || responseText}`);
                 }
             }
         } catch (error) {
             console.error("Error:", error);
-            setErrorMessage(
-                "Network error - make sure backend is running on localhost:8080"
-            );
+            setErrorMessage("Network error - make sure backend is running on localhost:8080");
         } finally {
             setIsLoading(false);
         }
@@ -131,7 +129,12 @@ function SignUp() {
                     className="flex items-center gap-2 text-slate-400 hover:text-sky-400 transition mb-6"
                 >
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                        <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M10 19l-7-7m0 0l7-7m-7 7h18"
+                        />
                     </svg>
                     Back to home
                 </button>
@@ -147,9 +150,7 @@ function SignUp() {
                 <form className="space-y-4" onSubmit={handleSubmit}>
                     <div className="grid grid-cols-2 gap-4">
                         <div>
-                            <label className="block text-sm font-medium text-slate-300 mb-2">
-                                First Name *
-                            </label>
+                            <label className="block text-sm font-medium text-slate-300 mb-2">First Name *</label>
                             <input
                                 type="text"
                                 name="firstName"
@@ -162,9 +163,7 @@ function SignUp() {
                         </div>
 
                         <div>
-                            <label className="block text-sm font-medium text-slate-300 mb-2">
-                                Surname *
-                            </label>
+                            <label className="block text-sm font-medium text-slate-300 mb-2">Surname *</label>
                             <input
                                 type="text"
                                 name="surname"
@@ -178,9 +177,7 @@ function SignUp() {
                     </div>
 
                     <div>
-                        <label className="block text-sm font-medium text-slate-300 mb-2">
-                            Email *
-                        </label>
+                        <label className="block text-sm font-medium text-slate-300 mb-2">Email *</label>
                         <input
                             type="email"
                             name="email"
@@ -193,9 +190,7 @@ function SignUp() {
                     </div>
 
                     <div>
-                        <label className="block text-sm font-medium text-slate-300 mb-2">
-                            Phone Number *
-                        </label>
+                        <label className="block text-sm font-medium text-slate-300 mb-2">Phone Number *</label>
                         <div className="flex">
                             <div className="flex items-center gap-2 px-4 py-3 bg-slate-800 border border-r-0 border-slate-700 rounded-l-xl">
                                 <span className="text-sm">🇿🇦</span>
@@ -214,9 +209,7 @@ function SignUp() {
                     </div>
 
                     <div>
-                        <label className="block text-sm font-medium text-slate-300 mb-2">
-                            Password *
-                        </label>
+                        <label className="block text-sm font-medium text-slate-300 mb-2">Password *</label>
                         <div className="relative">
                             <input
                                 type={showPassword ? "text" : "password"}
@@ -263,9 +256,7 @@ function SignUp() {
                     </div>
 
                     <div>
-                        <label className="block text-sm font-medium text-slate-300 mb-2">
-                            Confirm Password *
-                        </label>
+                        <label className="block text-sm font-medium text-slate-300 mb-2">Confirm Password *</label>
                         <div className="relative">
                             <input
                                 type={showConfirmPassword ? "text" : "password"}
@@ -309,9 +300,7 @@ function SignUp() {
                                 )}
                             </button>
                         </div>
-                        {passwordError && (
-                            <p className="mt-2 text-sm text-red-400">{passwordError}</p>
-                        )}
+                        {passwordError && <p className="mt-2 text-sm text-red-400">{passwordError}</p>}
                     </div>
 
                     <div className="flex items-start gap-2">
@@ -338,10 +327,7 @@ function SignUp() {
                 <div className="mt-6 text-center">
                     <p className="text-slate-400">
                         Already have an account?{" "}
-                        <button
-                            onClick={() => navigate("/login")}
-                            className="text-sky-400 hover:text-sky-300 font-medium transition"
-                        >
+                        <button onClick={() => navigate("/login")} className="text-sky-400 hover:text-sky-300 font-medium transition">
                             Log in
                         </button>
                     </p>

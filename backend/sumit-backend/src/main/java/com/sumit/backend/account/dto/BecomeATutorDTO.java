@@ -1,5 +1,9 @@
 package com.sumit.backend.account.dto;
 
+import com.sumit.backend.location.dto.TownDTO;
+import com.sumit.backend.reference.academics.subjects.dto.SubjectDTO;
+import com.sumit.backend.reference.language.dto.LanguageDTO;
+
 import java.util.List;
 
 public class BecomeATutorDTO {

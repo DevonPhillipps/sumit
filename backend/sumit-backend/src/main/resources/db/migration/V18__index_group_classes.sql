@@ -1,0 +1,1 @@
+CREATE INDEX idx_subject_town_language_combos ON subject_grade_town_language_combos (subject_id, town_id, language_id);

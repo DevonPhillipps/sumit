@@ -1,8 +1,8 @@
 package com.sumit.backend.account.entity;
 
 public enum Status {
-    pending,
-    accepted,
-    rejected,
-    withdrawn
+    PENDING,
+    ACCEPTED,
+    REJECTED,
+    WITHDRAWN
 }
