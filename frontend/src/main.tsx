@@ -14,6 +14,8 @@ import CreateClassPage from "./CreateClassPage";
 import FindTutor from "./FindTutor";
 import BookClassPage from "./BookClassPage";
 import TutorMyClassesPage from "./TutorMyClassesPage";
+import TutorValidateClassPage from "./TutorValidateClassPage";
+
 
 createRoot(document.getElementById("root") as HTMLElement).render(
     <StrictMode>
@@ -42,6 +44,9 @@ createRoot(document.getElementById("root") as HTMLElement).render(
 
                 <Route path="/book-class/:classId" element={<BookClassPage />} />
                 <Route path="/dashboard/tutor/my-classes" element={<TutorMyClassesPage />} />
+
+                <Route path="/dashboard/tutor/class/:recurrenceId/validate" element={<TutorValidateClassPage />}/>
+
 
             </Routes>
         </BrowserRouter>

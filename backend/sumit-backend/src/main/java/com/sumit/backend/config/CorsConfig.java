@@ -11,8 +11,15 @@ public class CorsConfig implements WebMvcConfigurer {
     public void addCorsMappings(CorsRegistry registry) {
         //todo in production replace localhost here with the website domain
         registry.addMapping("/**")
-                .allowedOrigins("http://localhost:5173")  // your Vite frontend
-                .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS")
+                .allowedOrigins(
+                        "http://localhost:5173",
+                        "http://192.168.3.243:5173",
+                        "http://172.18.192.1:5173",
+                        "http://localhost:4173",      // Vite preview port
+                        "http://192.168.3.243:4173"   // Vite preview on networ
+                )
+                // your Vite frontend
+                .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH")
                 .allowedHeaders("*")
                 .allowCredentials(true)
                 .maxAge(3600);

@@ -5,16 +5,16 @@ import com.sumit.backend.timeslots.dto.TimeslotsDTO;
 import java.time.DayOfWeek;
 import java.util.List;
 
-public class MyClassesDTO {
+public class TutorClassesDTO {
     private Integer classId;
-    private List<RecurrenceClassDTO> recurrenceClasses;
+    private List<TutorRecurrenceClassesDTO> recurrenceClasses;
     private String venueName;
     private String subject;
     private Integer grade;
     private TimeslotsDTO timeslot;
     private DayOfWeek dayOfWeek;
 
-    public MyClassesDTO() {
+    public TutorClassesDTO() {
 
     }
 
@@ -26,11 +26,11 @@ public class MyClassesDTO {
         this.dayOfWeek = dayOfWeek;
     }
 
-    public List<RecurrenceClassDTO> getRecurrenceClasses() {
+    public List<TutorRecurrenceClassesDTO> getRecurrenceClasses() {
         return recurrenceClasses;
     }
 
-    public void setRecurrenceClasses(List<RecurrenceClassDTO> recurrenceClasses) {
+    public void setRecurrenceClasses(List<TutorRecurrenceClassesDTO> recurrenceClasses) {
         this.recurrenceClasses= recurrenceClasses;
     }
 

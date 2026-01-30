@@ -42,7 +42,7 @@ public class ClassesController {
         return ResponseEntity.noContent().build();
     }
 
-    @PostMapping("submit-create-class-application")
+    @PostMapping("/submit-create-class-application")
     @PreAuthorize("hasRole('TUTOR') || hasRole('ADMIN')")
     public ResponseEntity<Void> submitCreateClassApplication(@RequestBody CreateClassDTO createClassDTO, @AuthenticationPrincipal UserDetails userDetails){
         Integer userId = Integer.parseInt(userDetails.getUsername());
@@ -50,10 +50,10 @@ public class ClassesController {
         return ResponseEntity.noContent().build();
     }
 
-    @GetMapping("student-view-my-classes")
-    public ResponseEntity<List<MyClassesDTO>> getMyClasses(@AuthenticationPrincipal UserDetails userDetails){
+    @GetMapping("/student-get-upcoming-classes")
+    public ResponseEntity<List<MyClassesDTO>> getMyUpcomingClasses(@AuthenticationPrincipal UserDetails userDetails){
         Integer userId = Integer.parseInt(userDetails.getUsername());
-        return ResponseEntity.ok(classesService.getMyClasses(userId));
+        return ResponseEntity.ok(classesService.getMyUpcomingClasses(userId));
     }
 
     @GetMapping("/get-all-classes-by-language-town-subject-grade")
@@ -61,12 +61,12 @@ public class ClassesController {
         return ResponseEntity.ok(classesService.getAllClassesByComboId(comboId));
     }
 
-    @GetMapping("book-group-class-page")
+    @GetMapping("/book-group-class-page")
     public ResponseEntity<GetBookClassPageDTO> bookGroupClassPage(@RequestParam Integer classId) {
         return ResponseEntity.ok(classesService.bookGroupClassPage(classId));
     }
 
-    @PostMapping("book-group-class")
+    @PostMapping("/book-group-class")
     @PreAuthorize("hasRole('STUDENT') || hasRole('TUTOR')")
     public ResponseEntity<Void> bookGroupClass(@RequestBody BookClassDTO bookClassDTO, @AuthenticationPrincipal UserDetails userDetails) {
         Integer userId = Integer.parseInt(userDetails.getUsername());
@@ -74,9 +74,38 @@ public class ClassesController {
         return ResponseEntity.noContent().build();
     }
 
-    @GetMapping("tutor-classes-overview")
+    @GetMapping("/tutor-classes-overview")
     public ResponseEntity<List<TutorClassesOverviewDTO>> getTutorClasses(@AuthenticationPrincipal UserDetails userDetails) {
         Integer userId = Integer.parseInt(userDetails.getUsername());
         return ResponseEntity.ok(classesService.getTutorClassesOverview(userId));
     }
+
+    @PatchMapping("/{classId}/students/me/cancel")
+    public ResponseEntity<Void> studentCancelClass(@PathVariable Integer classId, @AuthenticationPrincipal UserDetails userDetails) {
+        Integer userId = Integer.parseInt(userDetails.getUsername());
+        classesService.studentCancelClass(classId, userId);
+        return ResponseEntity.noContent().build();
+    }
+
+    @GetMapping("/tutor-get-all-classes")
+    public ResponseEntity<List<TutorClassesDTO>> getTutorClassesOverview(@AuthenticationPrincipal UserDetails userDetails) {
+        Integer userId = Integer.parseInt(userDetails.getUsername());
+        return ResponseEntity.ok(classesService.tutorGetAllClasses(userId));
+    }
+
+    @PostMapping("/tutor/recurrence/validate")
+    public ResponseEntity<Void> tutorValidateClass(@AuthenticationPrincipal UserDetails userDetails, @RequestBody ValidateClassDTO validateClassDTO) {
+        Integer userId = Integer.parseInt(userDetails.getUsername());
+        classesService.tutorValidateClass(validateClassDTO, userId);
+        return ResponseEntity.noContent().build();
+    }
+
+    @PatchMapping("tutor/recurrence/{recurrenceClassId}/cancel")
+    @PreAuthorize("hasRole('TUTOR') or hasRole('ADMIN')")
+    public ResponseEntity<Void> tutorCancelRecurrenceClass(@PathVariable Integer recurrenceClassId, @AuthenticationPrincipal UserDetails userDetails) {
+        Integer userId = Integer.parseInt(userDetails.getUsername());
+        classesService.tutorCancelRecurrenceClass(recurrenceClassId, userId);
+        return ResponseEntity.noContent().build();
+    }
+
 }

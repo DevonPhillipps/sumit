@@ -1,3 +1,26 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* ROOT SCROLLER — SAFE */
+html {
+    overscroll-behavior-y: none;
+}
+
+/* BODY — DO NOT FIX HEIGHT */
+body {
+    width: 100%;
+    min-height: 100%;
+    overflow-x: hidden;
+}
+
+/* Remove tap flash */
+* {
+    -webkit-tap-highlight-color: transparent;
+}
+
+/* Optional: remove focus outlines (accessibility tradeoff) */
+*:focus {
+    outline: none !important;
+    box-shadow: none !important;
+}

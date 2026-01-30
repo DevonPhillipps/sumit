@@ -1,10 +1,25 @@
 package com.sumit.backend.classes.dto;
 
+import com.sumit.backend.classes.entity.PaymentMethodSelectedEnum;
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotNull;
+
 public class BookClassDTO {
+    @NotNull
     private Integer classId;
+
+    @Min(0)
+    @NotNull
     private Integer numberOfSessionsBooked;
+
     private boolean isWeeklyBooking;
-    private short numberFreeLessonsApplied;
+
+    @NotNull
+    @Min(0)
+    private Integer numberFreeLessonsApplied;
+
+    @NotNull
+    private PaymentMethodSelectedEnum paymentMethodSelected;
 
     public Integer getClassId() {
         return classId;
@@ -30,11 +45,19 @@ public class BookClassDTO {
         isWeeklyBooking = weeklyBooking;
     }
 
-    public short getNumberFreeLessonsApplied() {
+    public Integer getNumberFreeLessonsApplied() {
         return numberFreeLessonsApplied;
     }
 
-    public void setNumberFreeLessonsApplied(short numberFreeLessonsApplied) {
+    public void setNumberFreeLessonsApplied(Integer numberFreeLessonsApplied) {
         this.numberFreeLessonsApplied = numberFreeLessonsApplied;
+    }
+
+    public PaymentMethodSelectedEnum getPaymentMethodSelected() {
+        return paymentMethodSelected;
+    }
+
+    public void setPaymentMethodSelected(PaymentMethodSelectedEnum paymentMethodSelected) {
+        this.paymentMethodSelected = paymentMethodSelected;
     }
 }

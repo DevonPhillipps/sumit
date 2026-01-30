@@ -33,13 +33,6 @@ public class GroupClassStudents {
     @Column(name = "booked_recurring", nullable = false)
     private Boolean bookedRecurring;
 
-    @Column(name = "classes_remaining", nullable = false)
-    private Integer classesRemaining;
-
-    @Column(name = "number_free_lessons_applied", nullable = false)
-    private short numberFreeLessonsApplied;
-
-
     public Integer getId() {
         return id;
     }
@@ -90,21 +83,5 @@ public class GroupClassStudents {
 
     public void setBookedRecurring(Boolean bookedRecurring) {
         this.bookedRecurring = bookedRecurring;
-    }
-
-    public Integer getClassesRemaining() {
-        return classesRemaining;
-    }
-
-    public void setClassesRemaining(Integer classesRemaining) {
-        this.classesRemaining = classesRemaining;
-    }
-
-    public short getNumberFreeLessonsApplied() {
-        return numberFreeLessonsApplied;
-    }
-
-    public void setNumberFreeLessonsApplied(short numberFreeLessonsApplied) {
-        this.numberFreeLessonsApplied = numberFreeLessonsApplied;
     }
 }

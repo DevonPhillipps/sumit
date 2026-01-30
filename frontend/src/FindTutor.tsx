@@ -1,5 +1,7 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import TopBar from "./components/TopBar";
+import { API_BASE_URL } from "./config/api";
 
 type TownDTO = { id: number; name: string };
 type SubjectWithoutGradesDTO = { id: number; name: string };
@@ -24,11 +26,7 @@ type ClassDTO = {
     dayOfWeek: string; // Java DayOfWeek -> "MONDAY"
 };
 
-type RoleUpper = "STUDENT" | "TUTOR" | "ADMIN";
-type RoleLower = "student" | "tutor" | "admin";
-type RoleAny = RoleUpper | RoleLower;
-
-const API_BASE = "http://localhost:8080";
+const API_BASE = API_BASE_URL;
 
 const API = {
     towns: `${API_BASE}/api/location/get-towns`,
@@ -38,30 +36,13 @@ const API = {
     classesByCombo: `${API_BASE}/api/classes/get-all-classes-by-language-town-subject-grade`,
 };
 
-function normalizeRole(raw: string | null): RoleUpper {
-    const v = (raw || "").trim();
-    if (!v) return "STUDENT";
-    const up = v.toUpperCase();
-    if (up === "STUDENT" || up === "TUTOR" || up === "ADMIN") return up as RoleUpper;
-    return "STUDENT";
-}
-
-function roleToPath(role: RoleAny): RoleLower {
-    const up = (role || "").toString().toUpperCase();
-    if (up === "TUTOR") return "tutor";
-    if (up === "ADMIN") return "admin";
-    return "student";
-}
+type FocusKey = "subject" | "town" | "language" | "grade" | null;
 
 function FindTutor() {
     const navigate = useNavigate();
 
     // PUBLIC page: token may be null
     const token = localStorage.getItem("token");
-
-    // tolerate old lowercase localStorage + new uppercase backend enums
-    const userRoleUpper = normalizeRole(localStorage.getItem("userRole"));
-    const dashboardPathRole = roleToPath(userRoleUpper);
 
     const authHeaders = useMemo(() => {
         const h: Record<string, string> = { "Content-Type": "application/json" };
@@ -91,6 +72,17 @@ function FindTutor() {
     // Error handling
     const [topError, setTopError] = useState<string | null>(null);
 
+    // Focus handling (fix "lingering blue border / second tap doesn't open" on mobile)
+    const [focused, setFocused] = useState<FocusKey>(null);
+    const activeSelectRef = useRef<HTMLSelectElement | null>(null);
+
+    const blurActive = () => {
+        const el = activeSelectRef.current || (document.activeElement as HTMLElement | null);
+        if (el && typeof (el as any).blur === "function") (el as any).blur();
+        activeSelectRef.current = null;
+        setFocused(null);
+    };
+
     const titleCase = (s: string) =>
         (s || "")
             .toLowerCase()
@@ -99,7 +91,6 @@ function FindTutor() {
             .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
             .join(" ");
 
-    // Works for "MONDAY" (DayOfWeek.name()) and also "monday" just in case
     const normalizeDay = (raw: string) => {
         if (!raw) return "";
         const s = raw.toLowerCase();
@@ -259,132 +250,185 @@ function FindTutor() {
         return { showNew: isNewClass(cur, max), showAlmost: isAlmostFull(cur, max) };
     };
 
-    return (
-        <div className="min-h-screen flex flex-col bg-slate-950 text-slate-100 overflow-x-hidden">
-            {/* HEADER */}
-            <header className="border-b border-slate-800 px-4 py-3 flex items-center justify-between relative z-20 bg-slate-950/80 backdrop-blur">
-                <div className="font-semibold text-lg tracking-tight cursor-pointer" onClick={() => navigate("/")}>
-                    Sumit
-                </div>
+    const selectClass = (key: FocusKey) => {
+        const base =
+            "mt-2 w-full rounded-2xl border-2 bg-white px-4 text-[17px] text-slate-900 font-semibold " +
+            "focus:outline-none appearance-none";
+        const tall = "py-4 md:py-3";
+        const border = focused === key ? "border-slate-900 ring-2 ring-slate-200" : "border-black";
+        return [base, tall, border].join(" ");
+    };
 
-                <div className="flex items-center gap-3">
-                    {!!token && (
-                        <button
-                            onClick={() => navigate(`/dashboard/${dashboardPathRole}`)}
-                            className="text-sm px-3 py-1 rounded-full border border-slate-700 hover:border-sky-500 transition"
-                        >
-                            Back to dashboard
-                        </button>
-                    )}
-                </div>
-            </header>
+    return (
+        <div
+            className="min-h-screen flex flex-col bg-slate-100 text-slate-900 overflow-x-hidden"
+            onPointerDownCapture={(e) => {
+                const t = e.target as HTMLElement | null;
+                const isSelect = !!t && (t.tagName === "SELECT" || t.closest("select"));
+                if (isSelect) {
+                    const active = document.activeElement as HTMLElement | null;
+                    if (active && active.tagName === "SELECT" && active !== t && !active.contains(t as any)) {
+                        blurActive();
+                    }
+                }
+            }}
+        >
+            {/* TOP BAR */}
+            <TopBar />
 
             {/* MAIN */}
-            <main className="relative flex-1 px-4 py-8 md:px-8 md:py-10">
-                {/* Glows */}
-                <div className="pointer-events-none absolute inset-0 overflow-hidden z-0">
-                    <div className="absolute -top-24 -left-10 h-64 w-64 rounded-full bg-sky-500/20 blur-3xl" />
-                    <div className="absolute top-1/4 right-0 h-72 w-72 rounded-full bg-indigo-500/20 blur-3xl" />
-                    <div className="absolute bottom-10 left-1/3 h-80 w-80 rounded-full bg-emerald-500/10 blur-3xl" />
+            <main className="relative flex-1 overflow-y-auto bg-white">
+                {/* LIGHT THEME GLOW ORBS (fixed background) */}
+                <div className="pointer-events-none fixed inset-0 overflow-hidden z-0">
+                    <div className="absolute -top-44 -left-40 h-[36rem] w-[36rem] rounded-full bg-sky-400/35 blur-3xl" aria-hidden="true" />
+                    <div className="absolute -top-40 right-[-6rem] h-[34rem] w-[34rem] rounded-full bg-indigo-400/30 blur-3xl" aria-hidden="true" />
+                    <div className="absolute top-6 left-1/2 h-[28rem] w-[28rem] -translate-x-1/2 rounded-full bg-fuchsia-400/20 blur-3xl" aria-hidden="true" />
+
+                    <div className="absolute top-[22%] -left-40 h-[34rem] w-[34rem] rounded-full bg-emerald-400/25 blur-3xl" aria-hidden="true" />
+                    <div className="absolute top-[26%] right-[-4rem] h-[40rem] w-[40rem] rounded-full bg-sky-300/22 blur-3xl" aria-hidden="true" />
+
+                    <div className="absolute top-[48%] left-[10%] h-[30rem] w-[30rem] rounded-full bg-violet-400/22 blur-3xl" aria-hidden="true" />
+                    <div className="absolute top-[52%] right-[12%] h-[26rem] w-[26rem] rounded-full bg-sky-400/18 blur-3xl" aria-hidden="true" />
+
+                    <div className="absolute bottom-48 right-[-10rem] h-[40rem] w-[40rem] rounded-full bg-indigo-300/22 blur-3xl" aria-hidden="true" />
+                    <div className="absolute bottom-24 left-[-6rem] h-[34rem] w-[34rem] rounded-full bg-emerald-400/18 blur-3xl" aria-hidden="true" />
+                    <div className="absolute bottom-[-10rem] left-1/2 h-[44rem] w-[44rem] -translate-x-1/2 rounded-full bg-sky-300/18 blur-3xl" aria-hidden="true" />
                 </div>
 
-                <div className="relative z-10 max-w-6xl mx-auto space-y-6">
-                    <section className="rounded-3xl border border-slate-800/70 bg-slate-900/80 px-6 py-6 md:px-8 md:py-7 shadow-lg shadow-slate-950/70">
-                        <h1 className="text-2xl md:text-3xl font-semibold tracking-tight">Find a class</h1>
-                        <p className="text-slate-300 text-sm md:text-base mt-2">
-                            Select your town, subject, and language — then we’ll show grades automatically.
-                        </p>
+                {/* SCROLLABLE CONTENT */}
+                <div className="relative z-10 px-4 py-6 md:px-8 md:py-10">
+                    <div className="max-w-6xl mx-auto space-y-6">
+                        {/* FILTERS CARD */}
+                        <section className="rounded-3xl border border-black bg-white p-5 md:p-7 shadow-[0_10px_30px_rgba(2,6,23,0.08)]">
+                            <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight">Find a class</h1>
 
-                        {topError && (
-                            <div className="mt-4 rounded-2xl border border-rose-800/60 bg-rose-900/20 px-4 py-3 text-xs text-rose-200">
-                                {topError}
-                            </div>
-                        )}
-
-                        {/* FILTERS */}
-                        <div className="mt-6 grid gap-4 md:grid-cols-3">
-                            {/* SUBJECT */}
-                            <div className="rounded-2xl border border-slate-800 bg-slate-950/40 p-4">
-                                <label className="text-xs uppercase tracking-wide text-slate-500">Subject</label>
-                                <select
-                                    className="mt-2 w-full rounded-2xl border border-slate-800 bg-slate-950 px-4 py-3 text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-sky-500/30 focus:border-sky-500/60"
-                                    value={selectedSubjectId}
-                                    onChange={(e) => setSelectedSubjectId(e.target.value ? Number(e.target.value) : "")}
-                                >
-                                    <option value="">Select subject</option>
-                                    {subjects.map((s) => (
-                                        <option key={s.id} value={s.id}>
-                                            {titleCase(s.name)}
-                                        </option>
-                                    ))}
-                                </select>
-                            </div>
-
-                            {/* TOWN */}
-                            <div className="rounded-2xl border border-slate-800 bg-slate-950/40 p-4">
-                                <label className="text-xs uppercase tracking-wide text-slate-500">Town</label>
-                                <select
-                                    className="mt-2 w-full rounded-2xl border border-slate-800 bg-slate-950 px-4 py-3 text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-sky-500/30 focus:border-sky-500/60"
-                                    value={selectedTownId}
-                                    onChange={(e) => setSelectedTownId(e.target.value ? Number(e.target.value) : "")}
-                                >
-                                    <option value="">Select town</option>
-                                    {towns.map((t) => (
-                                        <option key={t.id} value={t.id}>
-                                            {titleCase(t.name)}
-                                        </option>
-                                    ))}
-                                </select>
-                            </div>
-
-                            {/* LANGUAGE */}
-                            <div className="rounded-2xl border border-slate-800 bg-slate-950/40 p-4">
-                                <label className="text-xs uppercase tracking-wide text-slate-500">Language</label>
-                                <select
-                                    className="mt-2 w-full rounded-2xl border border-slate-800 bg-slate-950 px-4 py-3 text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-sky-500/30 focus:border-sky-500/60"
-                                    value={selectedLanguageId}
-                                    onChange={(e) => setSelectedLanguageId(e.target.value ? Number(e.target.value) : "")}
-                                >
-                                    <option value="">Select language</option>
-                                    {languages.map((l) => (
-                                        <option key={l.id} value={l.id}>
-                                            {titleCase(l.name)}
-                                        </option>
-                                    ))}
-                                </select>
-                            </div>
-                        </div>
-
-                        {/* GRADES */}
-                        <div className="mt-5">
-                            {!canFetchGrades ? (
-                                <div className="rounded-2xl border border-slate-800 bg-slate-900/40 px-4 py-4 text-xs text-slate-400">
-                                    Choose <span className="text-slate-200">subject</span>, <span className="text-slate-200">town</span>, and{" "}
-                                    <span className="text-slate-200">language</span> to reveal grades.
+                            {topError && (
+                                <div className="mt-4 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 font-semibold">
+                                    {topError}
                                 </div>
-                            ) : (
-                                <div className="rounded-3xl border border-slate-800 bg-slate-950/30 p-5">
+                            )}
+
+                            {/* FILTERS */}
+                            <div className="mt-6 grid gap-4 md:grid-cols-3">
+                                {/* SUBJECT */}
+                                <div className="rounded-3xl border border-slate-200 bg-slate-50 p-4">
+                                    <label className="text-xs uppercase tracking-wide text-slate-600 font-bold">Subject</label>
+                                    <select
+                                        className={selectClass("subject")}
+                                        value={selectedSubjectId}
+                                        onPointerDown={() => blurActive()}
+                                        onFocus={(e) => {
+                                            activeSelectRef.current = e.currentTarget;
+                                            setFocused("subject");
+                                        }}
+                                        onBlur={() => {
+                                            if (focused === "subject") setFocused(null);
+                                            activeSelectRef.current = null;
+                                        }}
+                                        onChange={(e) => setSelectedSubjectId(e.target.value ? Number(e.target.value) : "")}
+                                    >
+                                        <option value="">Select subject</option>
+                                        {subjects.map((s) => (
+                                            <option key={s.id} value={s.id}>
+                                                {titleCase(s.name)}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
+
+                                {/* TOWN */}
+                                <div className="rounded-3xl border border-slate-200 bg-slate-50 p-4">
+                                    <label className="text-xs uppercase tracking-wide text-slate-600 font-bold">Town</label>
+                                    <select
+                                        className={selectClass("town")}
+                                        value={selectedTownId}
+                                        onPointerDown={() => blurActive()}
+                                        onFocus={(e) => {
+                                            activeSelectRef.current = e.currentTarget;
+                                            setFocused("town");
+                                        }}
+                                        onBlur={() => {
+                                            if (focused === "town") setFocused(null);
+                                            activeSelectRef.current = null;
+                                        }}
+                                        onChange={(e) => setSelectedTownId(e.target.value ? Number(e.target.value) : "")}
+                                    >
+                                        <option value="">Select town</option>
+                                        {towns.map((t) => (
+                                            <option key={t.id} value={t.id}>
+                                                {titleCase(t.name)}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
+
+                                {/* LANGUAGE */}
+                                <div className="rounded-3xl border border-slate-200 bg-slate-50 p-4">
+                                    <label className="text-xs uppercase tracking-wide text-slate-600 font-bold">Language</label>
+                                    <select
+                                        className={selectClass("language")}
+                                        value={selectedLanguageId}
+                                        onPointerDown={() => blurActive()}
+                                        onFocus={(e) => {
+                                            activeSelectRef.current = e.currentTarget;
+                                            setFocused("language");
+                                        }}
+                                        onBlur={() => {
+                                            if (focused === "language") setFocused(null);
+                                            activeSelectRef.current = null;
+                                        }}
+                                        onChange={(e) => setSelectedLanguageId(e.target.value ? Number(e.target.value) : "")}
+                                    >
+                                        <option value="">Select language</option>
+                                        {languages.map((l) => (
+                                            <option key={l.id} value={l.id}>
+                                                {titleCase(l.name)}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
+                            </div>
+
+                            {/* GRADES */}
+                            <div className="mt-5">
+                                <div className="rounded-3xl border border-slate-200 bg-white p-5">
                                     <div className="flex items-center justify-between gap-3">
                                         <div>
-                                            <p className="text-sm font-semibold text-slate-100">Grades</p>
-                                            <p className="text-xs text-slate-400 mt-1">Select a grade to see available classes.</p>
+                                            <p className="text-sm font-extrabold text-slate-900">Grades</p>
                                         </div>
-                                        <div className="text-xs text-slate-400">{gradesLoading ? "Loading…" : `${gradeOptions.length} found`}</div>
+                                        <div className="text-xs text-slate-600 font-semibold">
+                                            {!canFetchGrades ? "Waiting for filters…" : gradesLoading ? "Loading…" : ""}
+                                        </div>
                                     </div>
 
                                     <div className="mt-4">
                                         <select
-                                            className="w-full rounded-2xl border border-slate-800 bg-slate-950 px-4 py-3 text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-sky-500/30 focus:border-sky-500/60"
+                                            className={selectClass("grade")}
                                             value={selectedComboId}
+                                            disabled={!canFetchGrades || gradesLoading}
+                                            onPointerDown={() => blurActive()}
+                                            onFocus={(e) => {
+                                                activeSelectRef.current = e.currentTarget;
+                                                setFocused("grade");
+                                            }}
+                                            onBlur={() => {
+                                                if (focused === "grade") setFocused(null);
+                                                activeSelectRef.current = null;
+                                            }}
                                             onChange={(e) => {
                                                 const val = e.target.value ? Number(e.target.value) : "";
                                                 setSelectedComboId(val);
                                                 if (val !== "") fetchClasses(val);
                                             }}
-                                            disabled={gradesLoading}
                                         >
                                             <option value="">
-                                                {gradesLoading ? "Loading grades..." : gradeOptions.length ? "Select grade" : "No grades found"}
+                                                {!canFetchGrades
+                                                    ? "Select subject/town/language first"
+                                                    : gradesLoading
+                                                        ? "Loading grades..."
+                                                        : gradeOptions.length
+                                                            ? "Select grade"
+                                                            : "No grades found"}
                                             </option>
 
                                             {gradeOptions.map((g) => (
@@ -395,125 +439,147 @@ function FindTutor() {
                                         </select>
                                     </div>
                                 </div>
-                            )}
-                        </div>
-                    </section>
-
-                    {/* CLASSES LIST */}
-                    <section className="rounded-3xl border border-slate-800/70 bg-slate-900/80 px-6 py-6 md:px-8 md:py-7 shadow-lg shadow-slate-950/70">
-                        <div className="flex items-center justify-between mb-4">
-                            <h2 className="text-sm font-semibold text-slate-100">Available classes</h2>
-                            <span className="text-xs text-slate-400">
-                                {selectedComboId === "" ? "Select a grade" : classesLoading ? "Loading..." : `${classes.length} found`}
-                            </span>
-                        </div>
-
-                        {selectedComboId === "" ? (
-                            <div className="rounded-2xl border border-slate-800 bg-slate-900/40 px-4 py-4 text-xs text-slate-400">
-                                Pick a grade to see classes.
                             </div>
-                        ) : classesLoading ? (
-                            <div className="rounded-2xl border border-slate-800 bg-slate-900/40 px-4 py-4 text-xs text-slate-400">
-                                Loading classes…
-                            </div>
-                        ) : classes.length === 0 ? (
-                            <div className="rounded-2xl border border-slate-800 bg-slate-900/40 px-4 py-4">
-                                <p className="text-sm font-medium text-slate-100">No classes found</p>
-                                <p className="text-xs text-slate-400 mt-1">Try another grade or change your filters.</p>
-                            </div>
-                        ) : (
-                            <div className="grid gap-3">
-                                {classes.map((cls) => {
-                                    const pills = capacityPills(cls);
+                        </section>
 
-                                    return (
-                                        <div
-                                            key={cls.groupClassId}
-                                            className="rounded-3xl border border-slate-800 bg-slate-900/90 px-5 py-4 shadow-lg shadow-slate-950/40"
-                                        >
-                                            <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-3">
-                                                <div className="min-w-0">
-                                                    <div className="flex items-center gap-2">
-                                                        <span className="inline-flex items-center px-3 py-1 rounded-full text-sm bg-sky-500/15 border border-sky-500/30 text-sky-200">
-                                                            {normalizeDay(cls.dayOfWeek)} · {formatTime(cls.startTime)}–{formatTime(cls.endTime)}
+                        {/* CLASSES LIST */}
+                        <section className="rounded-3xl bg-white p-5 md:p-7 shadow-[0_10px_30px_rgba(2,6,23,0.08)]">
+                            <div className="flex items-center justify-between mb-4">
+                                <h2 className="text-base md:text-lg font-extrabold text-slate-900">Available classes</h2>
+                                <span className="text-sm text-slate-600 font-semibold">
+                                    {selectedComboId === "" ? "Select a grade" : classesLoading ? "Loading..." : `${classes.length} found`}
+                                </span>
+                            </div>
+
+                            {selectedComboId === "" ? (
+                                <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm text-slate-600 font-semibold">
+                                    Pick a grade to see classes.
+                                </div>
+                            ) : classesLoading ? (
+                                <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm text-slate-600 font-semibold">
+                                    Loading classes…
+                                </div>
+                            ) : classes.length === 0 ? (
+                                <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4">
+                                    <p className="text-base font-extrabold text-slate-900">No classes found</p>
+                                    <p className="text-sm text-slate-600 mt-1 font-medium">Try another grade or change your filters.</p>
+                                </div>
+                            ) : (
+                                <div className="grid gap-4">
+                                    {classes.map((cls) => {
+                                        const pills = capacityPills(cls);
+
+                                        return (
+                                            <div
+                                                key={cls.groupClassId}
+                                                className="relative rounded-3xl border border-black bg-white px-5 py-5 shadow-[0_10px_30px_rgba(2,6,23,0.06)]"
+                                            >
+                                                {/* New pill top-right */}
+                                                {pills.showNew && (
+                                                    <div className="absolute top-4 right-4">
+                                                        <span className="inline-flex items-center px-3 py-1 rounded-full text-[12px] md:text-[13px] border border-slate-300 bg-slate-50 text-slate-900 font-extrabold">
+                                                            New
+                                                        </span>
+                                                    </div>
+                                                )}
+
+                                                <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
+                                                    <div className="min-w-0">
+                                                        <div className="flex items-center gap-2 flex-wrap">
+                                                            <span className="inline-flex items-center px-4 py-1.5 rounded-full text-[14px] md:text-[15px] border-2 border-blue-900 bg-blue-100 text-black font-extrabold">
+                                                                {normalizeDay(cls.dayOfWeek)} · {formatTime(cls.startTime)}–{formatTime(cls.endTime)}
+                                                            </span>
+
+                                                            {pills.showAlmost && (
+                                                                <span className="inline-flex items-center px-3 py-1 rounded-full text-[12px] md:text-[13px] border border-amber-300 bg-amber-50 text-amber-900 font-extrabold">
+                                                                    Almost full
+                                                                </span>
+                                                            )}
+                                                        </div>
+
+                                                        <p className="text-[18px] md:text-[19px] font-extrabold text-slate-900 mt-4 truncate">
+                                                            {cls.venueName || "Venue"}
+                                                        </p>
+
+                                                        <div className="mt-2 flex items-center gap-3 flex-wrap">
+                                                            <p className="text-[15px] md:text-[16px] text-slate-800 font-medium">
+                                                                Tutor:{" "}
+                                                                <span className="text-blue-900 font-extrabold">{cls.tutorName || "Unknown"}</span>
+                                                            </p>
+
+                                                            {cls.tutorId && (
+                                                                <button
+                                                                    className="inline-flex items-center gap-1 text-[12px] md:text-[13px] px-3 py-2 rounded-2xl border border-slate-200 bg-white hover:bg-slate-50 transition font-extrabold text-slate-900"
+                                                                    onClick={() => alert(`Tutor profile route later: /tutors/${cls.tutorId}`)}
+                                                                >
+                                                                    View profile →
+                                                                </button>
+                                                            )}
+                                                        </div>
+
+                                                        <p className="text-[14px] md:text-[15px] text-slate-800 mt-3 font-medium">
+                                                            <span className="text-slate-700 font-bold">Address:</span>{" "}
+                                                            <span className="text-slate-900">{cls.streetAddress || "Not set"}</span>
+                                                        </p>
+                                                    </div>
+
+                                                    <div className="flex flex-col items-start md:items-end gap-3">
+                                                        <span className="text-[14px] md:text-[15px] text-slate-800 font-extrabold">
+                                                            {capacityLine(cls)}
                                                         </span>
 
-                                                        {pills.showNew && (
-                                                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] border border-slate-700 bg-slate-950/40 text-slate-300">
-                                                                New
-                                                            </span>
-                                                        )}
-                                                        {pills.showAlmost && (
-                                                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] border border-amber-600/40 bg-amber-500/10 text-amber-200">
-                                                                Almost full
-                                                            </span>
-                                                        )}
-                                                    </div>
+                                                        <div className="flex flex-wrap gap-2">
+                                                            {cls.mapsUrl && (
+                                                                <a
+                                                                    href={cls.mapsUrl}
+                                                                    target="_blank"
+                                                                    rel="noreferrer"
+                                                                    className="inline-flex items-center gap-2 text-[12px] md:text-[13px] px-4 py-3 rounded-2xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-900 transition font-extrabold"
+                                                                >
+                                                                    Open map
+                                                                    <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                                                                        <path
+                                                                            d="M12 21s7-4.35 7-11a7 7 0 0 0-14 0c0 6.65 7 11 7 11z"
+                                                                            strokeWidth="1.6"
+                                                                        />
+                                                                        <path
+                                                                            d="M12 10.5a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5z"
+                                                                            strokeWidth="1.6"
+                                                                        />
+                                                                    </svg>
+                                                                </a>
+                                                            )}
 
-                                                    <p className="text-base font-semibold text-slate-100 mt-3 truncate">{cls.venueName || "Venue"}</p>
-
-                                                    <p className="text-sm text-slate-200 mt-1">
-                                                        Tutor: <span className="text-sky-300 font-semibold">{cls.tutorName || "Unknown"}</span>
-                                                    </p>
-
-                                                    <p className="text-sm text-slate-200 mt-2">
-                                                        <span className="text-slate-300 font-medium">Address:</span>{" "}
-                                                        <span className="text-slate-200">{cls.streetAddress || "Not set"}</span>
-                                                    </p>
-                                                </div>
-
-                                                <div className="flex flex-col items-start md:items-end gap-2">
-                                                    <span className="text-sm text-slate-200 font-medium">{capacityLine(cls)}</span>
-
-                                                    <div className="flex flex-wrap gap-2">
-                                                        {cls.mapsUrl && (
-                                                            <a
-                                                                href={cls.mapsUrl}
-                                                                target="_blank"
-                                                                rel="noreferrer"
-                                                                className="inline-flex items-center gap-2 text-xs px-3 py-2 rounded-2xl border border-slate-700 hover:border-emerald-500/60 text-slate-200 transition"
+                                                            <button
+                                                                className="inline-flex items-center gap-2 text-[12px] md:text-[13px] px-5 py-3 rounded-2xl bg-emerald-700 hover:bg-emerald-800 text-white font-extrabold transition"
+                                                                onClick={() => navigate(`/book-class/${cls.groupClassId}`, { state: { cls } })}
                                                             >
-                                                                Open map
-                                                                <svg className="h-4 w-4 text-emerald-300" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                                                                    <path d="M12 21s7-4.35 7-11a7 7 0 0 0-14 0c0 6.65 7 11 7 11z" strokeWidth="1.6" />
-                                                                    <path d="M12 10.5a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5z" strokeWidth="1.6" />
+                                                                Book class
+                                                                <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                                                                    <path d="M5 12h14" strokeWidth="1.8" strokeLinecap="round" />
+                                                                    <path
+                                                                        d="M13 6l6 6-6 6"
+                                                                        strokeWidth="1.8"
+                                                                        strokeLinecap="round"
+                                                                        strokeLinejoin="round"
+                                                                    />
                                                                 </svg>
-                                                            </a>
-                                                        )}
-
-                                                        <button
-                                                            className="inline-flex items-center gap-2 text-xs px-3 py-2 rounded-2xl bg-sky-500 hover:bg-sky-400 text-black font-semibold transition"
-                                                            onClick={() => navigate(`/book-class/${cls.groupClassId}`, { state: { cls } })}
-                                                        >
-                                                            Book class
-                                                            <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                                                                <path d="M5 12h14" strokeWidth="1.8" strokeLinecap="round" />
-                                                                <path d="M13 6l6 6-6 6" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-                                                            </svg>
-                                                        </button>
+                                                            </button>
+                                                        </div>
                                                     </div>
-
-                                                    {cls.tutorId && (
-                                                        <button
-                                                            className="text-[11px] text-sky-300 hover:text-sky-200 transition"
-                                                            onClick={() => alert(`Tutor profile route later: /tutors/${cls.tutorId}`)}
-                                                        >
-                                                            View tutor profile →
-                                                        </button>
-                                                    )}
                                                 </div>
                                             </div>
-                                        </div>
-                                    );
-                                })}
-                            </div>
-                        )}
-                    </section>
+                                        );
+                                    })}
+                                </div>
+                            )}
+                        </section>
+                    </div>
                 </div>
             </main>
 
             {/* FOOTER */}
-            <footer className="px-4 py-4 border-t border-slate-800 text-xs text-slate-400 text-center relative z-10">
+            <footer className="px-4 py-5 border-t border-slate-200 text-sm text-slate-600 text-center font-medium">
                 © {new Date().getFullYear()} Sumit. All rights reserved.
             </footer>
         </div>

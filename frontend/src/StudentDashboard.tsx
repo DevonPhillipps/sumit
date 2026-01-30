@@ -1,17 +1,38 @@
-// StudentDashboard.tsx
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import TopBar from "./components/TopBar";
+import { API_BASE_URL } from "./config/api";
 
-type UserRole = "student" | "tutor" | "admin";
+type UserRoleLower = "student" | "tutor" | "admin";
 
-type MyClassesDTO = {
-    [key: string]: any;
+type TimeslotsDTO = {
+    id?: number;
+    startTime?: string; // "14:00:00"
+    endTime?: string;   // "15:00:00"
 };
 
-const API_BASE = "http://localhost:5173";
+type RecurrenceStatus = "SCHEDULED" | "CANCELLED" | "COMPLETED" | "REMOVED";
+
+type RecurrenceClassDTO = {
+    recurrenceClassId: number;
+    classDate: string; // "YYYY-MM-DD"
+    recurrenceStatus: RecurrenceStatus;
+};
+
+type MyClassesDTO = {
+    classId: number;
+    recurrenceClasses: RecurrenceClassDTO[];
+    venueName: string | null;
+    subject: string | null;
+    grade: number | null;
+    timeslot: TimeslotsDTO | null;
+    dayOfWeek: string | null; // backend DayOfWeek -> "MONDAY"
+};
 
 const API = {
-    myClasses: `${API_BASE}/api/classes/view-my-classes`,
+    dashboard: `${API_BASE_URL}/api/classes/student-get-upcoming-classes`,
+    // ✅ uses your backend controller: @PatchMapping("/{classId}/students/me/cancel")
+    cancelClass: (classId: number) => `${API_BASE_URL}/api/classes/${classId}/students/me/cancel`,
 };
 
 async function readErrorText(res: Response) {
@@ -31,372 +52,472 @@ async function safeReadJson<T>(res: Response): Promise<T> {
     return (await res.json()) as T;
 }
 
-function StudentDashboard() {
-    const navigate = useNavigate();
-    const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
+function normalizeRoleLower(raw: string | null): UserRoleLower {
+    const v = (raw || "").trim();
+    if (!v) return "student";
+    const up = v.toUpperCase();
 
-    const [myClasses, setMyClasses] = useState<MyClassesDTO[]>([]);
-    const [myClassesLoading, setMyClassesLoading] = useState(false);
-    const [myClassesError, setMyClassesError] = useState<string | null>(null);
+    if (up === "STUDENT") return "student";
+    if (up === "TUTOR") return "tutor";
+    if (up === "ADMIN") return "admin";
+
+    const low = v.toLowerCase();
+    if (low === "student" || low === "tutor" || low === "admin") return low as UserRoleLower;
+    return "student";
+}
+
+function formatTime(t?: string | null) {
+    if (!t) return "—";
+    return t.length >= 5 ? t.slice(0, 5) : t;
+}
+
+function prettyDow(dow?: string | null) {
+    if (!dow) return "—";
+    const up = dow.toUpperCase();
+    const map: Record<string, string> = {
+        MONDAY: "Mon",
+        TUESDAY: "Tue",
+        WEDNESDAY: "Wed",
+        THURSDAY: "Thu",
+        FRIDAY: "Fri",
+        SATURDAY: "Sat",
+        SUNDAY: "Sun",
+    };
+    return map[up] || dow;
+}
+
+function parseDateISO(dateISO?: string | null) {
+    if (!dateISO) return null;
+    const d = new Date(dateISO + "T00:00:00");
+    return isNaN(d.getTime()) ? null : d;
+}
+
+function formatDateLabel(dateISO?: string | null) {
+    if (!dateISO) return "—";
+    const d = parseDateISO(dateISO);
+    if (!d) return dateISO;
+    return d.toLocaleDateString("en-ZA", { weekday: "short", day: "numeric", month: "short" });
+}
+
+function formatScheduleLine(dateISO?: string | null, start?: string | null, end?: string | null) {
+    const date = formatDateLabel(dateISO);
+    const time = `${formatTime(start)}–${formatTime(end)}`;
+    return `${time} • ${date}`;
+}
+
+type ScheduleRow = {
+    classId: number;
+    classDate: string;
+    recurrenceStatus: RecurrenceStatus;
+    subject: string | null;
+    grade: number | null;
+    venueName: string | null;
+    startTime: string | null;
+    endTime: string | null;
+};
+
+type ModalState =
+    | { open: false }
+    | { open: true; kind: "class"; item: MyClassesDTO };
+
+export default function StudentDashboard() {
+    const navigate = useNavigate();
 
     const token = localStorage.getItem("token");
-    const userRole = (localStorage.getItem("userRole") || "student") as UserRole;
+    const userRoleLower = normalizeRoleLower(localStorage.getItem("userRole"));
 
     const isAuthenticated = !!token;
-    const isStudent = userRole === "student";
+    const isStudent = userRoleLower === "student";
 
-    // Guard: ensure only logged-in students see this dashboard
+    const [data, setData] = useState<MyClassesDTO[]>([]);
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+
+    const [modal, setModal] = useState<ModalState>({ open: false });
+    const [actionLoading, setActionLoading] = useState(false);
+    const [actionError, setActionError] = useState<string | null>(null);
+    const [actionOk, setActionOk] = useState<string | null>(null);
+
+    useEffect(() => {
+        const existing = localStorage.getItem("userRole");
+        const normalized = normalizeRoleLower(existing);
+        if (existing !== normalized) localStorage.setItem("userRole", normalized);
+    }, []);
+
     useEffect(() => {
         if (!token) {
             navigate("/login", { replace: true });
             return;
         }
-        if (userRole !== "student") {
-            navigate(`/dashboard/${userRole}`, { replace: true });
+        if (userRoleLower !== "student") {
+            navigate(`/dashboard/${userRoleLower}`, { replace: true });
         }
-    }, [token, userRole, navigate]);
+    }, [token, userRoleLower, navigate]);
 
     const authHeaders = useMemo(() => {
-        const headers: Record<string, string> = {};
+        const headers: Record<string, string> = { "Content-Type": "application/json" };
         if (token) headers.Authorization = `Bearer ${token}`;
         return headers;
     }, [token]);
 
-    // Fetch my classes
-    useEffect(() => {
-        if (!token || userRole !== "student") return;
-
-        const run = async () => {
-            setMyClassesLoading(true);
-            setMyClassesError(null);
-
-            try {
-                const res = await fetch(API.myClasses, {
-                    method: "GET",
-                    headers: authHeaders,
-                });
-
-                if (!res.ok) {
-                    throw new Error(await readErrorText(res));
-                }
-
-                const data = await safeReadJson<MyClassesDTO[]>(res);
-                setMyClasses(Array.isArray(data) ? data : []);
-            } catch (e: any) {
-                setMyClassesError(e?.message || "Failed to load your classes");
-                setMyClasses([]);
-            } finally {
-                setMyClassesLoading(false);
-            }
-        };
-
-        run();
-    }, [token, userRole, authHeaders]);
-
-    const hasAnyClasses = myClasses.length > 0;
-
-    // Tiles (keep simple for now)
-    const enrolledCount = hasAnyClasses ? myClasses.length : 0;
-    const weekCount = hasAnyClasses ? myClasses.length : 0; // later: filter by current week once DTO has dates
-
-    const handleSignOut = () => {
-        localStorage.removeItem("token");
-        localStorage.removeItem("userId");
-        localStorage.removeItem("userRole");
-        setIsProfileMenuOpen(false);
-        navigate("/login");
-    };
-
-    const toggleProfileMenu = () => setIsProfileMenuOpen((prev) => !prev);
-    const handleLogoClick = () => navigate("/dashboard/student");
     const goFindClass = () => navigate("/find-tutor");
 
-    return (
-        <div className="min-h-screen flex flex-col bg-slate-950 text-slate-100 overflow-x-hidden">
-            {/* HEADER */}
-            <header className="border-b border-slate-800 px-4 py-3 flex items-center justify-between relative z-20 bg-slate-950/80 backdrop-blur">
-                <div className="font-semibold text-lg tracking-tight cursor-pointer" onClick={handleLogoClick}>
-                    Sumit
-                </div>
+    // ✅ Fetch/refresh function (used on load and after cancel)
+    const refreshDashboard = async () => {
+        if (!token || userRoleLower !== "student") return;
 
-                {!isAuthenticated ? (
-                    <div className="flex gap-3">
-                        <button
-                            className="text-sm px-3 py-1 rounded-full border border-slate-700 hover:border-sky-500 transition"
-                            onClick={() => navigate("/login")}
-                        >
-                            Log in
-                        </button>
-                        <button
-                            className="text-sm px-3 py-1 rounded-full bg-sky-500 hover:bg-sky-400 text-black font-medium transition"
-                            onClick={() => navigate("/signup")}
-                        >
-                            Sign up
-                        </button>
-                    </div>
-                ) : (
-                    <div className="flex items-center gap-3">
-                        {/* FIND A CLASS */}
-                        {isStudent && (
+        setLoading(true);
+        setError(null);
+
+        try {
+            const res = await fetch(API.dashboard, { method: "GET", headers: authHeaders });
+
+            if (res.status === 401 || res.status === 403) {
+                localStorage.removeItem("token");
+                navigate("/login", { replace: true });
+                return;
+            }
+
+            if (!res.ok) throw new Error(await readErrorText(res));
+
+            const payload = await safeReadJson<MyClassesDTO[]>(res);
+            setData(Array.isArray(payload) ? payload : []);
+        } catch (e: any) {
+            setError(e?.message || "Failed to load your dashboard");
+            setData([]);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        refreshDashboard();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [token, userRoleLower, authHeaders, navigate]);
+
+    const myClasses = useMemo(() => {
+        const arr = Array.isArray(data) ? data : [];
+        return [...arr].sort((a, b) => {
+            const s = String(a.subject || "").localeCompare(String(b.subject || ""), undefined, { sensitivity: "base" });
+            if (s !== 0) return s;
+            const g = (a.grade ?? 0) - (b.grade ?? 0);
+            if (g !== 0) return g;
+            return String(a.venueName || "").localeCompare(String(b.venueName || ""), undefined, { sensitivity: "base" });
+        });
+    }, [data]);
+
+    const scheduleRows = useMemo<ScheduleRow[]>(() => {
+        const rows: ScheduleRow[] = [];
+
+        for (const c of data || []) {
+            const startTime = c.timeslot?.startTime ?? null;
+            const endTime = c.timeslot?.endTime ?? null;
+
+            for (const r of c.recurrenceClasses || []) {
+                rows.push({
+                    classId: c.classId,
+                    classDate: r.classDate,
+                    recurrenceStatus: r.recurrenceStatus,
+                    subject: c.subject ?? null,
+                    grade: c.grade ?? null,
+                    venueName: c.venueName ?? null,
+                    startTime,
+                    endTime,
+                });
+            }
+        }
+
+        rows.sort((a, b) => {
+            const da = parseDateISO(a.classDate)?.getTime() ?? 0;
+            const db = parseDateISO(b.classDate)?.getTime() ?? 0;
+            if (da !== db) return da - db;
+            return formatTime(a.startTime).localeCompare(formatTime(b.startTime));
+        });
+
+        return rows;
+    }, [data]);
+
+    const hasAnything = myClasses.length > 0 || scheduleRows.length > 0;
+
+    // ✅ Cancel the class fully (backend cancels all upcoming recurrences)
+    async function cancelClassFully(classId: number) {
+        setActionLoading(true);
+        setActionError(null);
+        setActionOk(null);
+
+        try {
+            const res = await fetch(API.cancelClass(classId), {
+                method: "PATCH",
+                headers: authHeaders,
+            });
+
+            if (res.status === 401 || res.status === 403) {
+                localStorage.removeItem("token");
+                navigate("/login", { replace: true });
+                return;
+            }
+
+            if (!res.ok) throw new Error(await readErrorText(res));
+
+            setActionOk("Class cancelled.");
+            setModal({ open: false });
+
+            // ✅ refresh from backend so schedule + classes are correct
+            await refreshDashboard();
+        } catch (e: any) {
+            setActionError(e?.message || "Failed to cancel class");
+        } finally {
+            setActionLoading(false);
+        }
+    }
+
+    return (
+        <div className="min-h-screen flex flex-col bg-slate-100 text-slate-900 overflow-x-hidden">
+            <TopBar customActions={null} />
+
+            <main className="flex-1 px-4 py-6 md:px-8 md:py-10">
+                <div className="max-w-5xl mx-auto space-y-4">
+                    <div className="flex items-center justify-between gap-3">
+                        <h1 className="text-xl md:text-2xl font-extrabold text-slate-900">Student Dashboard</h1>
+
+                        {isAuthenticated && isStudent ? (
                             <button
                                 onClick={goFindClass}
-                                className="hidden sm:inline-flex items-center gap-2 text-sm px-4 py-2 rounded-full bg-sky-500 hover:bg-sky-400 text-black font-semibold transition shadow-lg shadow-sky-500/20"
-                                title="Browse tutors and available classes"
+                                className="inline-flex items-center gap-2 text-sm px-3 py-2 rounded-2xl bg-slate-900 hover:bg-slate-800 text-white transition font-semibold"
                             >
+                                Find a class
                                 <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor">
                                     <path d="M10 18a8 8 0 1 1 5.293-14.293A8 8 0 0 1 10 18z" strokeWidth="1.8" />
                                     <path d="M21 21l-4.3-4.3" strokeWidth="1.8" strokeLinecap="round" />
                                 </svg>
-                                Find a class
                             </button>
-                        )}
+                        ) : null}
+                    </div>
 
-                        {/* PROFILE MENU */}
-                        <div className="relative">
+                    {(error || actionError) && (
+                        <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 font-semibold whitespace-pre-wrap">
+                            {actionError || error}
+                        </div>
+                    )}
+
+                    {actionOk && (
+                        <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800 font-extrabold">
+                            {actionOk}
+                        </div>
+                    )}
+
+                    {loading && <div className="text-sm text-slate-600 font-semibold">Loading your dashboard…</div>}
+
+                    {!loading && !hasAnything && (
+                        <div className="rounded-3xl border border-slate-200 bg-slate-50 p-5">
+                            <p className="text-sm font-semibold text-slate-900">No classes yet</p>
+                            <p className="text-sm text-slate-600 mt-1">Once you book a class, it’ll show up here.</p>
+
                             <button
-                                onClick={toggleProfileMenu}
-                                className="flex items-center gap-2 px-2 py-1 rounded-full border border-slate-700 bg-slate-900/80 hover:border-sky-500 transition"
+                                onClick={goFindClass}
+                                className="mt-4 inline-flex items-center justify-center gap-2 px-4 py-3 rounded-2xl bg-emerald-700 hover:bg-emerald-800 text-white font-extrabold transition"
                             >
-                                <div className="h-8 w-8 rounded-full bg-sky-500/90 flex items-center justify-center text-xs font-semibold text-black">
-                                    <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                                        <path
-                                            d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4z"
-                                            strokeWidth="1.8"
-                                            strokeLinecap="round"
-                                            strokeLinejoin="round"
-                                        />
-                                        <path
-                                            d="M4 20c0-2.7614 3.134-5 8-5s8 2.2386 8 5"
-                                            strokeWidth="1.8"
-                                            strokeLinecap="round"
-                                            strokeLinejoin="round"
-                                        />
-                                    </svg>
-                                </div>
-
-                                <div className="hidden sm:flex items-center">
-                                    <span className="text-xs font-medium text-slate-100">Profile</span>
-                                </div>
-
-                                <svg
-                                    className={`h-4 w-4 text-slate-400 transition-transform ${
-                                        isProfileMenuOpen ? "rotate-180" : ""
-                                    }`}
-                                    viewBox="0 0 24 24"
-                                    fill="none"
-                                    stroke="currentColor"
-                                >
-                                    <path d="M6 9l6 6 6-6" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                                Find a class
+                                <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                                    <path d="M5 12h14" strokeWidth="1.8" strokeLinecap="round" />
+                                    <path d="M13 6l6 6-6 6" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
                                 </svg>
                             </button>
-
-                            {isProfileMenuOpen && (
-                                <div className="absolute right-0 mt-2 w-64 rounded-2xl bg-slate-900 border border-slate-800 shadow-xl shadow-slate-950/70 py-2 z-30">
-                                    <div className="px-4 pb-2">
-                                        <p className="text-xs uppercase tracking-wide text-slate-500">Account</p>
-                                        <p className="text-sm text-slate-200 mt-1">
-                                            {userRole === "tutor"
-                                                ? "Tutor account"
-                                                : userRole === "admin"
-                                                    ? "Admin account"
-                                                    : "Student account"}
-                                        </p>
-                                    </div>
-
-                                    <button
-                                        className="w-full text-left px-4 py-2 text-sm text-slate-200 hover:bg-slate-800/80 transition"
-                                        onClick={() => {
-                                            setIsProfileMenuOpen(false);
-                                            navigate("/profile");
-                                        }}
-                                    >
-                                        Profile
-                                    </button>
-
-                                    <button
-                                        className="w-full text-left px-4 py-2 text-sm text-slate-200 hover:bg-slate-800/80 transition"
-                                        onClick={() => {
-                                            setIsProfileMenuOpen(false);
-                                            navigate("/my-sessions");
-                                        }}
-                                    >
-                                        My sessions
-                                    </button>
-
-                                    <button
-                                        className="w-full text-left px-4 py-2 text-sm text-slate-200 hover:bg-slate-800/80 transition"
-                                        onClick={() => {
-                                            setIsProfileMenuOpen(false);
-                                            navigate("/become-tutor");
-                                        }}
-                                    >
-                                        Become a tutor
-                                    </button>
-
-                                    <div className="my-1 border-t border-slate-800" />
-
-                                    <button
-                                        className="w-full text-left px-4 py-2 text-sm text-red-400 hover:bg-red-500/10 transition"
-                                        onClick={handleSignOut}
-                                    >
-                                        Sign out
-                                    </button>
-                                </div>
-                            )}
                         </div>
-                    </div>
-                )}
-            </header>
+                    )}
 
-            {/* MAIN */}
-            <main className="relative flex-1 px-4 py-8 md:px-8 md:py-10">
-                {/* Background glows */}
-                <div className="pointer-events-none absolute inset-0 overflow-hidden z-0">
-                    <div className="absolute -top-24 -left-10 h-64 w-64 rounded-full bg-sky-500/20 blur-3xl" />
-                    <div className="absolute top-1/4 right-0 h-72 w-72 rounded-full bg-indigo-500/20 blur-3xl" />
-                    <div className="absolute bottom-10 left-1/3 h-80 w-80 rounded-full bg-emerald-500/10 blur-3xl" />
-                </div>
-
-                <div className="relative z-10 max-w-6xl mx-auto space-y-8">
-                    {/* MAIN CARD */}
-                    <section className="rounded-3xl border border-slate-800/70 bg-slate-900/80 px-6 py-6 md:px-8 md:py-7 shadow-lg shadow-slate-950/70">
-                        <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-6">
-                            <div className="min-w-0">
-                                <h1 className="text-2xl md:text-3xl font-semibold tracking-tight">Student Dashboard</h1>
-
-                                {myClassesError && (
-                                    <div className="mt-4 rounded-2xl border border-amber-600/50 bg-amber-900/20 px-4 py-3 text-xs text-amber-200 whitespace-pre-wrap">
-                                        {myClassesError}
-                                    </div>
-                                )}
-
-                                {/* EMPTY STATE */}
-                                {!myClassesLoading && !hasAnyClasses && (
-                                    <div className="mt-6 rounded-3xl border border-slate-800 bg-gradient-to-br from-slate-900/90 to-slate-900/40 p-5">
-                                        <div className="flex items-start gap-4">
-                                            <div className="h-10 w-10 rounded-2xl bg-sky-500/15 border border-sky-500/30 flex items-center justify-center">
-                                                <svg
-                                                    className="h-5 w-5 text-sky-300"
-                                                    viewBox="0 0 24 24"
-                                                    fill="none"
-                                                    stroke="currentColor"
-                                                >
-                                                    <path
-                                                        d="M12 3l2.5 5.5L20 9l-4 4 .9 6-4.9-2.8L7.1 19 8 13 4 9l5.5-.5L12 3z"
-                                                        strokeWidth="1.6"
-                                                        strokeLinejoin="round"
-                                                    />
-                                                </svg>
-                                            </div>
-
-                                            <div className="flex-1">
-                                                <p className="text-sm font-semibold text-slate-100">No classes yet</p>
-                                                <p className="text-xs text-slate-400 mt-1">Once you book a class, it’ll show up here.</p>
-
-                                                <button
-                                                    onClick={goFindClass}
-                                                    className="mt-4 inline-flex items-center justify-center gap-2 px-4 py-2 rounded-2xl bg-sky-500 hover:bg-sky-400 text-black font-semibold transition shadow-lg shadow-sky-500/20"
-                                                >
-                                                    Find a class
-                                                    <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                                                        <path d="M5 12h14" strokeWidth="1.8" strokeLinecap="round" />
-                                                        <path
-                                                            d="M13 6l6 6-6 6"
-                                                            strokeWidth="1.8"
-                                                            strokeLinecap="round"
-                                                            strokeLinejoin="round"
-                                                        />
-                                                    </svg>
-                                                </button>
-                                            </div>
-                                        </div>
-                                    </div>
-                                )}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {/* Schedule */}
+                        <div className="rounded-3xl border border-black bg-white p-5 shadow-[0_10px_30px_rgba(2,6,23,0.08)]">
+                            <div className="flex items-center justify-between">
+                                <p className="text-base font-extrabold text-slate-900">Schedule</p>
+                                <p className="text-xs text-slate-500 font-semibold">
+                                    {scheduleRows.length ? `${scheduleRows.length} upcoming` : "No upcoming"}
+                                </p>
                             </div>
 
-                            {/* TODAY PANEL */}
-                            <div className="w-full md:max-w-sm rounded-3xl border border-slate-800/70 bg-slate-950/30 px-5 py-5">
-                                <div className="flex items-center justify-between">
-                                    <h2 className="text-sm font-semibold text-slate-100">Today</h2>
-                                    <span className="text-xs text-slate-400">
-                                        {new Date().toLocaleDateString("en-ZA", {
-                                            weekday: "short",
-                                            day: "numeric",
-                                            month: "short",
-                                        })}
-                                    </span>
-                                </div>
-
-                                <div className="mt-4 rounded-2xl border border-slate-800 bg-slate-900/60 px-4 py-4">
-                                    {myClassesLoading ? (
-                                        <p className="text-xs text-slate-400">Loading your classes…</p>
-                                    ) : hasAnyClasses ? (
-                                        <p className="text-xs text-slate-400">Sessions feed later.</p>
+                            <div className="mt-4 rounded-2xl border border-slate-300 bg-slate-200">
+                                <div className="max-h-[360px] overflow-auto p-2">
+                                    {!scheduleRows.length && !loading ? (
+                                        <div className="p-3 text-sm text-slate-600 font-semibold">Nothing scheduled yet.</div>
                                     ) : (
-                                        <p className="text-xs text-slate-400">No sessions booked for today.</p>
+                                        <div className="space-y-2">
+                                            {scheduleRows.map((r, idx) => (
+                                                <div
+                                                    key={`${r.classId}-${r.classDate}-${idx}`}
+                                                    className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-[0_6px_18px_rgba(2,6,23,0.08)]"
+                                                >
+                                                    <div className="flex items-start justify-between gap-3">
+                                                        <div className="min-w-0">
+                                                            <div className="text-sm font-extrabold text-slate-900 truncate">
+                                                                {r.subject} • Grade {r.grade ?? "—"}
+                                                            </div>
+
+                                                            <div className="text-xs text-slate-700 font-semibold mt-1">
+                                                                {formatScheduleLine(r.classDate, r.startTime, r.endTime)}
+                                                            </div>
+
+                                                            <div className="text-xs text-slate-600 font-semibold mt-1">
+                                                                {r.venueName || "—"}
+                                                            </div>
+                                                        </div>
+
+                                                        <div className="shrink-0 flex items-center gap-2">
+                                                            {r.recurrenceStatus === "CANCELLED" && (
+                                                                <span className="text-[11px] font-extrabold px-2 py-1 rounded-full bg-amber-100 text-amber-800 border border-amber-200">
+                                  CANCELLED
+                                </span>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
                                     )}
                                 </div>
                             </div>
                         </div>
 
-                        {/* SUMMARY TILES (BACK) */}
-                        <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mt-6">
-                            <div className="rounded-2xl border border-slate-800 bg-slate-900/90 px-4 py-3">
-                                <p className="text-xs uppercase tracking-wide text-slate-400">Enrolled classes</p>
-                                <p className="text-xl font-semibold mt-1">{enrolledCount}</p>
-                                <p className="text-xs text-slate-400">active subjects</p>
+                        {/* My classes */}
+                        <div className="rounded-3xl border border-black bg-white p-5 shadow-[0_10px_30px_rgba(2,6,23,0.08)]">
+                            <div className="flex items-center justify-between">
+                                <p className="text-base font-extrabold text-slate-900">My classes</p>
+                                <p className="text-xs text-slate-500 font-semibold">
+                                    {myClasses.length ? `${myClasses.length} enrolled` : "None yet"}
+                                </p>
                             </div>
 
-                            <div className="rounded-2xl border border-slate-800 bg-slate-900/90 px-4 py-3">
-                                <p className="text-xs uppercase tracking-wide text-slate-400">This week</p>
-                                <p className="text-xl font-semibold mt-1">{weekCount}</p>
-                                <p className="text-xs text-slate-400">planned items</p>
+                            <div className="mt-4 rounded-2xl border border-sky-100 bg-sky-50">
+                                <div className="max-h-[360px] overflow-auto p-2">
+                                    {!myClasses.length && !loading ? (
+                                        <div className="p-3 text-sm text-slate-600 font-semibold">
+                                            You’re not enrolled in any classes yet.
+                                        </div>
+                                    ) : (
+                                        <div className="space-y-2">
+                                            {myClasses.map((c) => (
+                                                <button
+                                                    key={c.classId}
+                                                    onClick={() => {
+                                                        setActionError(null);
+                                                        setActionOk(null);
+                                                        setModal({ open: true, kind: "class", item: c });
+                                                    }}
+                                                    className="w-full text-left rounded-2xl border border-slate-200 bg-white hover:bg-slate-50 transition px-4 py-3 shadow-[0_6px_18px_rgba(2,6,23,0.08)]"
+                                                >
+                                                    <div className="flex items-start justify-between gap-3">
+                                                        <div className="min-w-0">
+                                                            <div className="text-sm font-extrabold text-slate-900 truncate">
+                                                                {c.subject} • Grade {c.grade ?? "—"}
+                                                            </div>
+
+                                                            <div className="text-xs text-slate-700 font-semibold mt-1">
+                                                                {prettyDow(c.dayOfWeek)} • {formatTime(c.timeslot?.startTime)}–{formatTime(c.timeslot?.endTime)}
+                                                            </div>
+
+                                                            <div className="text-xs text-slate-600 font-semibold mt-1">
+                                                                {c.venueName || "—"}
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </button>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
                             </div>
 
-                            <div className="rounded-2xl border border-slate-800 bg-slate-900/90 px-4 py-3 hidden md:block">
-                                <p className="text-xs uppercase tracking-wide text-slate-400">Next step</p>
-                                <p className="text-sm font-medium mt-1 text-sky-400">Book a class</p>
-                                <p className="text-xs text-slate-400">then track everything here</p>
-                            </div>
-                        </div>
-                    </section>
-
-                    {/* FUTURE: MY CLASSES LIST */}
-                    {hasAnyClasses && (
-                        <section className="rounded-3xl border border-slate-800/70 bg-slate-900/80 px-6 py-6 md:px-8 md:py-7 shadow-lg shadow-slate-950/70">
-                            <div className="flex items-center justify-between mb-4">
-                                <h2 className="text-sm font-semibold text-slate-100">Your classes</h2>
+                            {!myClasses.length && !loading && (
                                 <button
-                                    className="text-xs text-sky-400 hover:text-sky-300 transition"
-                                    onClick={() => navigate("/my-sessions")}
+                                    onClick={goFindClass}
+                                    className="mt-4 w-full inline-flex items-center justify-center gap-2 px-4 py-3 rounded-2xl bg-emerald-700 hover:bg-emerald-800 text-white font-extrabold transition"
                                 >
-                                    View sessions
+                                    Find a class
+                                    <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                                        <path d="M5 12h14" strokeWidth="1.8" strokeLinecap="round" />
+                                        <path d="M13 6l6 6-6 6" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                                    </svg>
                                 </button>
-                            </div>
-
-                            {/* for now show raw JSON so you can see the DTO shape */}
-                            <div className="rounded-2xl border border-slate-800 bg-slate-950/30 px-4 py-4">
-                                <pre className="text-[11px] text-slate-200 overflow-auto whitespace-pre-wrap">
-                                    {JSON.stringify(myClasses, null, 2)}
-                                </pre>
-                            </div>
-                        </section>
-                    )}
+                            )}
+                        </div>
+                    </div>
 
                     {!isStudent && isAuthenticated && (
-                        <div className="rounded-2xl border border-amber-600/70 bg-amber-900/30 px-4 py-3 text-xs text-amber-100">
-                            You are logged in as <span className="font-semibold">{userRole}</span>. Redirecting…
+                        <div className="rounded-2xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-800 font-semibold">
+                            You are logged in as {userRoleLower}. Redirecting…
                         </div>
                     )}
                 </div>
             </main>
 
-            {/* FOOTER */}
-            <footer className="px-4 py-4 border-t border-slate-800 text-xs text-slate-400 text-center relative z-10">
+            <footer className="px-4 py-5 border-t border-slate-200 text-sm text-slate-600 text-center font-medium">
                 © {new Date().getFullYear()} Sumit. All rights reserved.
             </footer>
+
+            {/* ✅ My classes modal only */}
+            {modal.open && (
+                <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center">
+                    <div
+                        className="absolute inset-0 bg-black/40"
+                        onClick={() => !actionLoading && setModal({ open: false })}
+                    />
+                    <div className="relative w-full md:max-w-xl bg-white rounded-t-3xl md:rounded-3xl border border-black shadow-[0_30px_80px_rgba(2,6,23,0.35)]">
+                        <div className="p-5">
+                            <div className="flex items-start justify-between gap-3">
+                                <div>
+                                    <div className="text-lg font-extrabold text-slate-900">
+                                        {modal.item.subject} • Grade {modal.item.grade ?? "—"}
+                                    </div>
+                                    <div className="text-sm text-slate-600 font-semibold mt-1">{modal.item.venueName || "—"}</div>
+                                </div>
+
+                                <button
+                                    onClick={() => !actionLoading && setModal({ open: false })}
+                                    className="shrink-0 rounded-2xl px-3 py-2 text-sm font-extrabold border border-slate-200 hover:bg-slate-50 transition"
+                                >
+                                    Close
+                                </button>
+                            </div>
+
+                            <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 space-y-2">
+                                <div className="flex items-center justify-between text-sm">
+                                    <span className="text-slate-600 font-semibold">Weekly</span>
+                                    <span className="text-slate-900 font-extrabold">
+                    {prettyDow(modal.item.dayOfWeek)} • {formatTime(modal.item.timeslot?.startTime)}–{formatTime(modal.item.timeslot?.endTime)}
+                  </span>
+                                </div>
+
+                                {/* ✅ small permanent warning box (what you asked) */}
+                                <div className="rounded-2xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900 font-extrabold">
+                                    Cancelling this class will cancel it permanently.
+                                </div>
+
+                                <div className="text-xs text-slate-600 font-semibold pt-2">
+                                    Leaving will remove you from the class and cancel all your upcoming sessions for it.
+                                </div>
+                            </div>
+
+                            <div className="mt-5 flex flex-col md:flex-row gap-3">
+                                <button
+                                    disabled={actionLoading}
+                                    onClick={() => cancelClassFully(modal.item.classId)}
+                                    className="w-full inline-flex items-center justify-center px-4 py-3 rounded-2xl bg-rose-600 hover:bg-rose-700 disabled:opacity-60 text-white font-extrabold transition"
+                                >
+                                    {actionLoading ? "Cancelling…" : "Cancel / leave this class"}
+                                </button>
+
+                                <button
+                                    disabled={actionLoading}
+                                    onClick={() => setModal({ open: false })}
+                                    className="w-full inline-flex items-center justify-center px-4 py-3 rounded-2xl border border-slate-200 hover:bg-slate-50 disabled:opacity-60 font-extrabold transition"
+                                >
+                                    Back
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
-
-export default StudentDashboard;

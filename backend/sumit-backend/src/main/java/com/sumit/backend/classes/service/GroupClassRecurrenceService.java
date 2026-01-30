@@ -1,8 +1,8 @@
 package com.sumit.backend.classes.service;
 
-import com.sumit.backend.classes.entity.GroupClassRecurrence;
-import com.sumit.backend.classes.entity.GroupClassRecurrenceStatus;
+import com.sumit.backend.classes.entity.*;
 import com.sumit.backend.classes.repository.GroupClassRecurrenceRepository;
+import com.sumit.backend.classes.repository.GroupClassRecurrenceStudentsRepository;
 import jakarta.transaction.Transactional;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -17,6 +17,9 @@ import java.util.List;
 public class GroupClassRecurrenceService {
     @Autowired
     GroupClassRecurrenceRepository groupClassRecurrenceRepository;
+
+    @Autowired
+    GroupClassRecurrenceStudentsRepository groupClassRecurrenceStudentsRepository;
 
     @Transactional
     public void setAllGroupClassRecurrences(Integer groupClassId, DayOfWeek classDay, LocalDate startDate, LocalDate endDate) {
@@ -44,5 +47,30 @@ public class GroupClassRecurrenceService {
             currentDate = currentDate.plusWeeks(1);
         }
         groupClassRecurrenceRepository.saveAll(groupClassRecurrences);
+    }
+
+    @Transactional
+    public void bookStudentRecurrenceClasses(Integer groupClassStudentId, Integer numberClassesBooked, Integer freeLessonsUsed, PaymentMethodSelectedEnum paymentMethodSelected, List<GroupClassRecurrence> recurrenceClasses){
+        //todo only return first x however that is done. currently returns all recurrence classes not the numberClassesBooked
+        if (recurrenceClasses.size() < numberClassesBooked) {
+            throw new RuntimeException("Not enough scheduled recurrence classes");
+        }
+
+        List<GroupClassRecurrenceStudents> recurrenceStudents = new ArrayList<>();
+        for (int i = 0; i < numberClassesBooked; i++) {
+            GroupClassRecurrence recurrenceClass = recurrenceClasses.get(i);
+            GroupClassRecurrenceStudents recurrenceStudent = new GroupClassRecurrenceStudents();
+            if (freeLessonsUsed != null && freeLessonsUsed > 0) {
+                recurrenceStudent.setPaymentMethodSelected(PaymentMethodSelectedEnum.FREE_LESSON);
+                freeLessonsUsed--;
+            } else {
+                recurrenceStudent.setPaymentMethodSelected(paymentMethodSelected);
+            }
+            recurrenceStudent.setGroupClassRecurrenceId(recurrenceClass.getId());
+            recurrenceStudent.setGroupClassStudentId(groupClassStudentId);
+            recurrenceStudent.setStatus(GroupClassRecurrenceStudentsStatus.SCHEDULED);
+            recurrenceStudents.add(recurrenceStudent);
+        }
+        groupClassRecurrenceStudentsRepository.saveAll(recurrenceStudents);
     }
 }

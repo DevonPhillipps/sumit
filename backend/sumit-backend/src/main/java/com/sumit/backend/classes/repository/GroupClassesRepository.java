@@ -20,4 +20,5 @@ public interface GroupClassesRepository extends JpaRepository<GroupClasses, Inte
     List<GroupClasses> findAllByComboIdAndStatus(Integer comboId, GroupClassStatus status);
     List<GroupClasses> findAllByTutorId(Integer tutorId);
     List<GroupClasses> findAllByStatus(GroupClassStatus groupClassStatus);
+    List<GroupClasses> findAllByTutorIdAndStatus(Integer tutorId, GroupClassStatus status);
 }

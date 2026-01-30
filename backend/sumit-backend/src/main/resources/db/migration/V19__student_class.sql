@@ -5,15 +5,12 @@ CREATE TABLE group_class_students (
     group_class_id INTEGER NOT NULL REFERENCES group_classes(id) ON DELETE CASCADE,
     student_user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
     booked_recurring BOOLEAN NOT NULL DEFAULT FALSE,
-    classes_remaining INTEGER NOT NULL DEFAULT 1 CHECK (classes_remaining >= 0),
-    number_free_lessons_applied INTEGER NOT NULL DEFAULT 0 CHECK (number_free_lessons_applied >= 0),
-    status VARCHAR(20) NOT NULL DEFAULT 'ACTIVE',
+    status VARCHAR(20) NOT NULL DEFAULT 'ACTIVE' CHECK (status IN ('ACTIVE','CANCELLED','EXPIRED')),
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    cancelled_at TIMESTAMPTZ,
-    CONSTRAINT uq_group_class_students UNIQUE (group_class_id, student_user_id),
-    CONSTRAINT check_group_class_students_status CHECK (status IN ('ACTIVE', 'CANCELLED', 'EXPIRED')),
-    CONSTRAINT chk_recurring_overrides_pack CHECK ( (booked_recurring = TRUE AND classes_remaining = 0) OR (booked_recurring = FALSE))
+    cancelled_at TIMESTAMPTZ
 );
+
+CREATE UNIQUE INDEX uq_gcs_active ON group_class_students (group_class_id, student_user_id) WHERE status = 'ACTIVE';
 
 CREATE TABLE group_class_recurrence (
     id SERIAL PRIMARY KEY,

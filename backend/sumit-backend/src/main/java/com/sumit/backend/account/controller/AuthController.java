@@ -16,6 +16,12 @@ public class AuthController {
     @Autowired
     AuthService authService;
 
+    @GetMapping("/validate")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<Void> validateToken(@AuthenticationPrincipal UserDetails userDetails){
+        return ResponseEntity.ok().build();
+    }
+
     @GetMapping("/role")
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<Role> getCurrentUserRole(@AuthenticationPrincipal UserDetails userDetails) {
