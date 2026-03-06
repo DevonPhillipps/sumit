@@ -33,5 +33,6 @@ public interface GroupClassRecurrenceRepository extends JpaRepository<GroupClass
     List<GroupClassRecurrence> findByGroupClassIdInAndStatus(Set<Integer> groupClassId, GroupClassRecurrenceStatus status);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
-    Optional<GroupClassRecurrence> findByIdForUpdate(Integer id);
+    @Query("select g from GroupClassRecurrence g where g.id = :id")
+    Optional<GroupClassRecurrence> findByIdForUpdate(@Param("id") Integer id);
 }

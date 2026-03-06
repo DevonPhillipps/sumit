@@ -1,5 +1,6 @@
 package com.sumit.backend.classes.service;
 
+import com.sumit.backend.account.entity.Role;
 import com.sumit.backend.account.entity.Tutor;
 import com.sumit.backend.account.entity.User;
 import com.sumit.backend.account.repository.TutorRepository;
@@ -32,6 +33,7 @@ import com.sumit.backend.venue_timeslots.repository.VenueTimeslotsRepository;
 import jakarta.transaction.Transactional;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
@@ -1004,7 +1006,6 @@ public class ClassesService {
 
                     sdto.setStudentFirstName(u.getFirstName());
                     sdto.setStudentLastName(u.getSurname());
-                    sdto.setStudentEmail(u.getEmail());
 
                     sdto.setPaymentMethodSelected(rcs.getPaymentMethodSelected());
 
@@ -1220,4 +1221,15 @@ public class ClassesService {
         userRepository.saveAll(users);
         groupClassRecurrenceRepository.save(groupClassRecurrence);
     }
+
+    public long getPendingGroupClassesCount(Integer userId) {
+        User user = userRepository.findById(userId).orElseThrow(() -> new RuntimeException("user not found"));
+        if (user.getRole() != Role.ADMIN) {
+            throw new AccessDeniedException("Only admins can access this endpoint");
+        }
+
+        return  groupClassesRepository.countByStatus(GroupClassStatus.PENDING);
+    }
+
+
 }

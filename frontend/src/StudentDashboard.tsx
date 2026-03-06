@@ -8,7 +8,7 @@ type UserRoleLower = "student" | "tutor" | "admin";
 type TimeslotsDTO = {
     id?: number;
     startTime?: string; // "14:00:00"
-    endTime?: string;   // "15:00:00"
+    endTime?: string; // "15:00:00"
 };
 
 type RecurrenceStatus = "SCHEDULED" | "CANCELLED" | "COMPLETED" | "REMOVED";
@@ -31,7 +31,6 @@ type MyClassesDTO = {
 
 const API = {
     dashboard: `${API_BASE_URL}/api/classes/student-get-upcoming-classes`,
-    // ✅ uses your backend controller: @PatchMapping("/{classId}/students/me/cancel")
     cancelClass: (classId: number) => `${API_BASE_URL}/api/classes/${classId}/students/me/cancel`,
 };
 
@@ -92,22 +91,50 @@ function parseDateISO(dateISO?: string | null) {
     return isNaN(d.getTime()) ? null : d;
 }
 
-function formatDateLabel(dateISO?: string | null) {
-    if (!dateISO) return "—";
-    const d = parseDateISO(dateISO);
-    if (!d) return dateISO;
-    return d.toLocaleDateString("en-ZA", { weekday: "short", day: "numeric", month: "short" });
+function toISODateLocal(d: Date) {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    return `${y}-${m}-${day}`;
 }
 
-function formatScheduleLine(dateISO?: string | null, start?: string | null, end?: string | null) {
-    const date = formatDateLabel(dateISO);
-    const time = `${formatTime(start)}–${formatTime(end)}`;
-    return `${time} • ${date}`;
+function startOfMonth(d: Date) {
+    return new Date(d.getFullYear(), d.getMonth(), 1);
+}
+
+function addMonths(d: Date, delta: number) {
+    return new Date(d.getFullYear(), d.getMonth() + delta, 1);
+}
+
+function getCalendarGrid(monthDate: Date) {
+    // Monday-first calendar (variable number of rows)
+    const first = startOfMonth(monthDate);
+
+    const firstDowSun0 = first.getDay(); // 0=Sun..6=Sat
+    const firstDowMon0 = (firstDowSun0 + 6) % 7; // 0=Mon..6=Sun
+
+    const daysInMonth = new Date(first.getFullYear(), first.getMonth() + 1, 0).getDate();
+
+    // total cells needed = leading blanks + days in month
+    const totalCells = firstDowMon0 + daysInMonth;
+
+    // weeks needed (4/5/6)
+    const weeks = Math.ceil(totalCells / 7);
+    const cellCount = weeks * 7;
+
+    const days: Date[] = [];
+    for (let i = 0; i < cellCount; i++) {
+        const d = new Date(first);
+        d.setDate(1 - firstDowMon0 + i);
+        days.push(d);
+    }
+
+    return { days };
 }
 
 type ScheduleRow = {
     classId: number;
-    classDate: string;
+    classDate: string; // YYYY-MM-DD
     recurrenceStatus: RecurrenceStatus;
     subject: string | null;
     grade: number | null;
@@ -118,7 +145,8 @@ type ScheduleRow = {
 
 type ModalState =
     | { open: false }
-    | { open: true; kind: "class"; item: MyClassesDTO };
+    | { open: true; kind: "class"; item: MyClassesDTO }
+    | { open: true; kind: "day"; dateISO: string; rows: ScheduleRow[] };
 
 export default function StudentDashboard() {
     const navigate = useNavigate();
@@ -137,6 +165,8 @@ export default function StudentDashboard() {
     const [actionLoading, setActionLoading] = useState(false);
     const [actionError, setActionError] = useState<string | null>(null);
     const [actionOk, setActionOk] = useState<string | null>(null);
+
+    const [calendarMonth, setCalendarMonth] = useState<Date>(() => startOfMonth(new Date()));
 
     useEffect(() => {
         const existing = localStorage.getItem("userRole");
@@ -161,50 +191,6 @@ export default function StudentDashboard() {
     }, [token]);
 
     const goFindClass = () => navigate("/find-tutor");
-
-    // ✅ Fetch/refresh function (used on load and after cancel)
-    const refreshDashboard = async () => {
-        if (!token || userRoleLower !== "student") return;
-
-        setLoading(true);
-        setError(null);
-
-        try {
-            const res = await fetch(API.dashboard, { method: "GET", headers: authHeaders });
-
-            if (res.status === 401 || res.status === 403) {
-                localStorage.removeItem("token");
-                navigate("/login", { replace: true });
-                return;
-            }
-
-            if (!res.ok) throw new Error(await readErrorText(res));
-
-            const payload = await safeReadJson<MyClassesDTO[]>(res);
-            setData(Array.isArray(payload) ? payload : []);
-        } catch (e: any) {
-            setError(e?.message || "Failed to load your dashboard");
-            setData([]);
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    useEffect(() => {
-        refreshDashboard();
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [token, userRoleLower, authHeaders, navigate]);
-
-    const myClasses = useMemo(() => {
-        const arr = Array.isArray(data) ? data : [];
-        return [...arr].sort((a, b) => {
-            const s = String(a.subject || "").localeCompare(String(b.subject || ""), undefined, { sensitivity: "base" });
-            if (s !== 0) return s;
-            const g = (a.grade ?? 0) - (b.grade ?? 0);
-            if (g !== 0) return g;
-            return String(a.venueName || "").localeCompare(String(b.venueName || ""), undefined, { sensitivity: "base" });
-        });
-    }, [data]);
 
     const scheduleRows = useMemo<ScheduleRow[]>(() => {
         const rows: ScheduleRow[] = [];
@@ -237,9 +223,87 @@ export default function StudentDashboard() {
         return rows;
     }, [data]);
 
+    const myClasses = useMemo(() => {
+        const arr = Array.isArray(data) ? data : [];
+        return [...arr].sort((a, b) => {
+            const s = String(a.subject || "").localeCompare(String(b.subject || ""), undefined, { sensitivity: "base" });
+            if (s !== 0) return s;
+            const g = (a.grade ?? 0) - (b.grade ?? 0);
+            if (g !== 0) return g;
+            return String(a.venueName || "").localeCompare(String(b.venueName || ""), undefined, { sensitivity: "base" });
+        });
+    }, [data]);
+
     const hasAnything = myClasses.length > 0 || scheduleRows.length > 0;
 
-    // ✅ Cancel the class fully (backend cancels all upcoming recurrences)
+    const scheduleByDay = useMemo(() => {
+        const map = new Map<string, ScheduleRow[]>();
+        for (const r of scheduleRows) {
+            const arr = map.get(r.classDate) || [];
+            arr.push(r);
+            map.set(r.classDate, arr);
+        }
+        for (const [k, v] of map.entries()) {
+            v.sort((a, b) => formatTime(a.startTime).localeCompare(formatTime(b.startTime)));
+            map.set(k, v);
+        }
+        return map;
+    }, [scheduleRows]);
+
+    const calendarDays = useMemo(() => getCalendarGrid(calendarMonth).days, [calendarMonth]);
+
+    const calendarTitle = useMemo(() => {
+        return calendarMonth.toLocaleDateString("en-ZA", { month: "long", year: "numeric" });
+    }, [calendarMonth]);
+
+    const refreshDashboard = async () => {
+        if (!token || userRoleLower !== "student") return;
+
+        setLoading(true);
+        setError(null);
+
+        try {
+            const res = await fetch(API.dashboard, { method: "GET", headers: authHeaders });
+
+            if (res.status === 401 || res.status === 403) {
+                localStorage.removeItem("token");
+                navigate("/login", { replace: true });
+                return;
+            }
+
+            if (!res.ok) throw new Error(await readErrorText(res));
+
+            const payload = await safeReadJson<MyClassesDTO[]>(res);
+            const arr = Array.isArray(payload) ? payload : [];
+            setData(arr);
+
+            const allDates: string[] = [];
+            for (const c of arr) for (const r of c.recurrenceClasses || []) allDates.push(r.classDate);
+            allDates.sort((a, b) => (parseDateISO(a)?.getTime() ?? 0) - (parseDateISO(b)?.getTime() ?? 0));
+            const earliest = allDates[0];
+            if (earliest) {
+                const d = parseDateISO(earliest);
+                if (d) {
+                    const curMonthHasAny = calendarDays.some((cd) => {
+                        const iso = toISODateLocal(cd);
+                        return cd.getMonth() === calendarMonth.getMonth() && (scheduleByDay.get(iso)?.length ?? 0) > 0;
+                    });
+                    if (!curMonthHasAny) setCalendarMonth(startOfMonth(d));
+                }
+            }
+        } catch (e: any) {
+            setError(e?.message || "Failed to load your dashboard");
+            setData([]);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        refreshDashboard();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [token, userRoleLower, authHeaders, navigate]);
+
     async function cancelClassFully(classId: number) {
         setActionLoading(true);
         setActionError(null);
@@ -262,7 +326,6 @@ export default function StudentDashboard() {
             setActionOk("Class cancelled.");
             setModal({ open: false });
 
-            // ✅ refresh from backend so schedule + classes are correct
             await refreshDashboard();
         } catch (e: any) {
             setActionError(e?.message || "Failed to cancel class");
@@ -271,28 +334,40 @@ export default function StudentDashboard() {
         }
     }
 
+    function openDayPopup(dateISO: string) {
+        setActionError(null);
+        setActionOk(null);
+
+        const rows = scheduleByDay.get(dateISO) || [];
+        if (!rows.length) return;
+
+        setModal({ open: true, kind: "day", dateISO, rows });
+    }
+
     return (
         <div className="min-h-screen flex flex-col bg-slate-100 text-slate-900 overflow-x-hidden">
             <TopBar customActions={null} />
 
-            <main className="flex-1 px-4 py-6 md:px-8 md:py-10">
-                <div className="max-w-5xl mx-auto space-y-4">
-                    <div className="flex items-center justify-between gap-3">
-                        <h1 className="text-xl md:text-2xl font-extrabold text-slate-900">Student Dashboard</h1>
+            {/* ORB BACKGROUND (same as FindTutor) */}
+            <div className="pointer-events-none fixed inset-0 overflow-hidden z-0">
+                <div className="absolute -top-44 -left-40 h-[36rem] w-[36rem] rounded-full bg-sky-400/35 blur-3xl" aria-hidden="true" />
+                <div className="absolute -top-40 right-[-6rem] h-[34rem] w-[34rem] rounded-full bg-indigo-400/30 blur-3xl" aria-hidden="true" />
+                <div className="absolute top-6 left-1/2 h-[28rem] w-[28rem] -translate-x-1/2 rounded-full bg-fuchsia-400/20 blur-3xl" aria-hidden="true" />
 
-                        {isAuthenticated && isStudent ? (
-                            <button
-                                onClick={goFindClass}
-                                className="inline-flex items-center gap-2 text-sm px-3 py-2 rounded-2xl bg-slate-900 hover:bg-slate-800 text-white transition font-semibold"
-                            >
-                                Find a class
-                                <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                                    <path d="M10 18a8 8 0 1 1 5.293-14.293A8 8 0 0 1 10 18z" strokeWidth="1.8" />
-                                    <path d="M21 21l-4.3-4.3" strokeWidth="1.8" strokeLinecap="round" />
-                                </svg>
-                            </button>
-                        ) : null}
-                    </div>
+                <div className="absolute top-[22%] -left-40 h-[34rem] w-[34rem] rounded-full bg-emerald-400/25 blur-3xl" aria-hidden="true" />
+                <div className="absolute top-[26%] right-[-4rem] h-[40rem] w-[40rem] rounded-full bg-sky-300/22 blur-3xl" aria-hidden="true" />
+
+                <div className="absolute top-[48%] left-[10%] h-[30rem] w-[30rem] rounded-full bg-violet-400/22 blur-3xl" aria-hidden="true" />
+                <div className="absolute top-[52%] right-[12%] h-[26rem] w-[26rem] rounded-full bg-sky-400/18 blur-3xl" aria-hidden="true" />
+
+                <div className="absolute bottom-48 right-[-10rem] h-[40rem] w-[40rem] rounded-full bg-indigo-300/22 blur-3xl" aria-hidden="true" />
+                <div className="absolute bottom-24 left-[-6rem] h-[34rem] w-[34rem] rounded-full bg-emerald-400/18 blur-3xl" aria-hidden="true" />
+                <div className="absolute bottom-[-10rem] left-1/2 h-[44rem] w-[44rem] -translate-x-1/2 rounded-full bg-sky-300/18 blur-3xl" aria-hidden="true" />
+            </div>
+
+            {/* CONTENT LAYER */}
+            <main className="relative z-10 flex-1 px-4 py-6 md:px-8 md:py-10">
+                <div className="max-w-5xl mx-auto space-y-4">
 
                     {(error || actionError) && (
                         <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 font-semibold whitespace-pre-wrap">
@@ -327,7 +402,7 @@ export default function StudentDashboard() {
                     )}
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {/* Schedule */}
+                        {/* Schedule (Calendar) */}
                         <div className="rounded-3xl border border-black bg-white p-5 shadow-[0_10px_30px_rgba(2,6,23,0.08)]">
                             <div className="flex items-center justify-between">
                                 <p className="text-base font-extrabold text-slate-900">Schedule</p>
@@ -336,44 +411,86 @@ export default function StudentDashboard() {
                                 </p>
                             </div>
 
-                            <div className="mt-4 rounded-2xl border border-slate-300 bg-slate-200">
-                                <div className="max-h-[360px] overflow-auto p-2">
-                                    {!scheduleRows.length && !loading ? (
-                                        <div className="p-3 text-sm text-slate-600 font-semibold">Nothing scheduled yet.</div>
-                                    ) : (
-                                        <div className="space-y-2">
-                                            {scheduleRows.map((r, idx) => (
-                                                <div
-                                                    key={`${r.classId}-${r.classDate}-${idx}`}
-                                                    className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-[0_6px_18px_rgba(2,6,23,0.08)]"
-                                                >
-                                                    <div className="flex items-start justify-between gap-3">
-                                                        <div className="min-w-0">
-                                                            <div className="text-sm font-extrabold text-slate-900 truncate">
-                                                                {r.subject} • Grade {r.grade ?? "—"}
-                                                            </div>
+                            <div className="mt-4 rounded-2xl border border-slate-300 bg-slate-50 p-3">
+                                {/* Header */}
+                                <div className="flex items-center justify-between gap-2">
+                                    <button
+                                        onClick={() => setCalendarMonth((m) => addMonths(m, -1))}
+                                        className="rounded-2xl px-3 py-2 text-sm font-extrabold border border-slate-200 hover:bg-white transition"
+                                        aria-label="Previous month"
+                                    >
+                                        ←
+                                    </button>
 
-                                                            <div className="text-xs text-slate-700 font-semibold mt-1">
-                                                                {formatScheduleLine(r.classDate, r.startTime, r.endTime)}
-                                                            </div>
+                                    <div className="text-sm font-extrabold text-slate-900">{calendarTitle}</div>
 
-                                                            <div className="text-xs text-slate-600 font-semibold mt-1">
-                                                                {r.venueName || "—"}
-                                                            </div>
-                                                        </div>
+                                    <button
+                                        onClick={() => setCalendarMonth((m) => addMonths(m, +1))}
+                                        className="rounded-2xl px-3 py-2 text-sm font-extrabold border border-slate-200 hover:bg-white transition"
+                                        aria-label="Next month"
+                                    >
+                                        →
+                                    </button>
+                                </div>
 
-                                                        <div className="shrink-0 flex items-center gap-2">
-                                                            {r.recurrenceStatus === "CANCELLED" && (
-                                                                <span className="text-[11px] font-extrabold px-2 py-1 rounded-full bg-amber-100 text-amber-800 border border-amber-200">
-                                  CANCELLED
-                                </span>
-                                                            )}
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            ))}
+                                {/* DOW */}
+                                <div className="mt-3 grid grid-cols-7 gap-2 text-[11px] font-extrabold text-slate-500">
+                                    {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((d) => (
+                                        <div key={d} className="text-center">
+                                            {d}
                                         </div>
-                                    )}
+                                    ))}
+                                </div>
+
+                                {/* Grid */}
+                                <div className="mt-2 grid grid-cols-7 gap-2">
+                                    {calendarDays.map((d, idx) => {
+                                        const iso = toISODateLocal(d);
+                                        const inMonth = d.getMonth() === calendarMonth.getMonth();
+                                        const rows = scheduleByDay.get(iso) || [];
+                                        const hasEvents = rows.length > 0;
+
+                                        const base =
+                                            "rounded-2xl border h-12 px-2 py-2 text-sm font-extrabold transition relative flex items-center justify-center";
+
+                                        const normalStyle = "bg-white border-slate-200 text-slate-900 hover:bg-slate-50";
+
+                                        const eventStyle =
+                                            "bg-sky-600 border-sky-700 text-white hover:bg-sky-700 shadow-[0_8px_18px_rgba(2,6,23,0.12)]";
+
+                                        if (!inMonth) {
+                                            return (
+                                                <div
+                                                    key={`${iso}-${idx}`}
+                                                    className="rounded-2xl border h-12 px-2 py-2 border-transparent bg-transparent"
+                                                />
+                                            );
+                                        }
+
+                                        return (
+                                            <button
+                                                key={`${iso}-${idx}`}
+                                                onClick={() => hasEvents && openDayPopup(iso)}
+                                                disabled={!hasEvents}
+                                                className={[
+                                                    base,
+                                                    hasEvents ? eventStyle : normalStyle,
+                                                    !hasEvents ? "cursor-default" : "",
+                                                ].join(" ")}
+                                                title={hasEvents ? "View lessons" : ""}
+                                            >
+                                                <span className="leading-none">{d.getDate()}</span>
+
+                                                {hasEvents && rows.length > 1 ? (
+                                                    <span className="absolute top-2 right-2 inline-flex items-center gap-1">
+        <span className="h-1.5 w-1.5 rounded-full bg-white/90" />
+        <span className="h-1.5 w-1.5 rounded-full bg-white/90" />
+      </span>
+                                                ) : null}
+                                            </button>
+                                        );
+
+                                    })}
                                 </div>
                             </div>
                         </div>
@@ -412,7 +529,8 @@ export default function StudentDashboard() {
                                                             </div>
 
                                                             <div className="text-xs text-slate-700 font-semibold mt-1">
-                                                                {prettyDow(c.dayOfWeek)} • {formatTime(c.timeslot?.startTime)}–{formatTime(c.timeslot?.endTime)}
+                                                                {prettyDow(c.dayOfWeek)} • {formatTime(c.timeslot?.startTime)}–
+                                                                {formatTime(c.timeslot?.endTime)}
                                                             </div>
 
                                                             <div className="text-xs text-slate-600 font-semibold mt-1">
@@ -450,74 +568,136 @@ export default function StudentDashboard() {
                 </div>
             </main>
 
-            <footer className="px-4 py-5 border-t border-slate-200 text-sm text-slate-600 text-center font-medium">
+            <footer className="relative z-10 px-4 py-5 border-t border-slate-200 text-sm text-slate-600 text-center font-medium">
                 © {new Date().getFullYear()} Sumit. All rights reserved.
             </footer>
 
-            {/* ✅ My classes modal only */}
-            {modal.open && (
-                <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center">
-                    <div
-                        className="absolute inset-0 bg-black/40"
+            {/* Day popup (calendar click) */}
+            {modal.open && modal.kind === "day" && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+                    {/* Backdrop */}
+                    <button
+                        type="button"
+                        aria-label="Close modal"
+                        className="absolute inset-0 bg-black/50"
                         onClick={() => !actionLoading && setModal({ open: false })}
                     />
-                    <div className="relative w-full md:max-w-xl bg-white rounded-t-3xl md:rounded-3xl border border-black shadow-[0_30px_80px_rgba(2,6,23,0.35)]">
-                        <div className="p-5">
-                            <div className="flex items-start justify-between gap-3">
-                                <div>
-                                    <div className="text-lg font-extrabold text-slate-900">
-                                        {modal.item.subject} • Grade {modal.item.grade ?? "—"}
-                                    </div>
-                                    <div className="text-sm text-slate-600 font-semibold mt-1">{modal.item.venueName || "—"}</div>
+
+                    {/* Modal */}
+                    <div className="relative w-full max-w-2xl rounded-3xl border border-black bg-white shadow-[0_30px_80px_rgba(2,6,23,0.35)]">
+                        <div className="p-6 md:p-8">
+                            {/* Header */}
+                            <div className="flex items-start justify-between gap-4">
+                                <div className="text-2xl md:text-3xl font-extrabold text-slate-900">
+                                    {new Date(modal.dateISO + "T00:00:00").toLocaleDateString("en-ZA", {
+                                        weekday: "long",
+                                        day: "2-digit",
+                                        month: "short",
+                                    })}
                                 </div>
 
                                 <button
                                     onClick={() => !actionLoading && setModal({ open: false })}
-                                    className="shrink-0 rounded-2xl px-3 py-2 text-sm font-extrabold border border-slate-200 hover:bg-slate-50 transition"
+                                    className="shrink-0 rounded-2xl px-4 py-2.5 text-sm md:text-base font-extrabold border border-slate-200 hover:bg-slate-50 transition"
                                 >
                                     Close
                                 </button>
                             </div>
 
-                            <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 space-y-2">
-                                <div className="flex items-center justify-between text-sm">
+                            {/* Lessons list */}
+                            <div className="mt-6 space-y-3 max-h-[60vh] overflow-auto pr-1">
+                                {modal.rows.map((r, i) => (
+                                    <div
+                                        key={`${r.classId}-${r.classDate}-${i}`}
+                                        className="rounded-3xl border border-slate-200 bg-slate-50 p-5 md:p-6"
+                                    >
+                                        <div className="text-lg md:text-xl font-extrabold text-slate-900">
+                                            {r.subject} • Grade {r.grade ?? "—"}
+                                        </div>
+
+                                        <div className="mt-2 text-sm md:text-base text-slate-700 font-semibold">
+                                            {formatTime(r.startTime)}–{formatTime(r.endTime)}
+                                        </div>
+
+                                        <div className="mt-1 text-sm md:text-base text-slate-600 font-semibold">
+                                            {r.venueName || "—"}
+                                        </div>
+
+                                        {r.recurrenceStatus === "CANCELLED" && (
+                                            <div className="mt-3 inline-block text-xs md:text-sm font-extrabold px-3 py-1.5 rounded-full bg-amber-100 text-amber-800 border border-amber-200">
+                                                CANCELLED
+                                            </div>
+                                        )}
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+
+
+            {/* My classes popup */}
+            {modal.open && modal.kind === "class" && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+                    {/* Backdrop */}
+                    <button
+                        type="button"
+                        aria-label="Close modal"
+                        className="absolute inset-0 bg-black/50"
+                        onClick={() => !actionLoading && setModal({ open: false })}
+                    />
+
+                    {/* Modal */}
+                    <div className="relative w-full max-w-2xl rounded-3xl border border-black bg-white shadow-[0_30px_80px_rgba(2,6,23,0.35)]">
+                        <div className="p-6 md:p-8">
+                            <div className="flex items-start justify-between gap-4">
+                                <div className="min-w-0">
+                                    <div className="text-2xl md:text-3xl font-extrabold text-slate-900 truncate">
+                                        {modal.item.subject} • Grade {modal.item.grade ?? "—"}
+                                    </div>
+                                    <div className="text-base md:text-lg text-slate-600 font-semibold mt-2 truncate">
+                                        {modal.item.venueName || "—"}
+                                    </div>
+                                </div>
+
+                                <button
+                                    onClick={() => !actionLoading && setModal({ open: false })}
+                                    className="shrink-0 rounded-2xl px-4 py-2.5 text-sm md:text-base font-extrabold border border-slate-200 hover:bg-slate-50 transition"
+                                >
+                                    Close
+                                </button>
+                            </div>
+
+                            <div className="mt-6 rounded-3xl border border-slate-200 bg-slate-50 px-5 py-5 md:px-6 md:py-6 space-y-3">
+                                <div className="flex items-center justify-between gap-3 text-base md:text-lg">
                                     <span className="text-slate-600 font-semibold">Weekly</span>
                                     <span className="text-slate-900 font-extrabold">
-                    {prettyDow(modal.item.dayOfWeek)} • {formatTime(modal.item.timeslot?.startTime)}–{formatTime(modal.item.timeslot?.endTime)}
-                  </span>
+              {prettyDow(modal.item.dayOfWeek)} • {formatTime(modal.item.timeslot?.startTime)}–
+                                        {formatTime(modal.item.timeslot?.endTime)}
+            </span>
                                 </div>
 
-                                {/* ✅ small permanent warning box (what you asked) */}
-                                <div className="rounded-2xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900 font-extrabold">
-                                    Cancelling this class will cancel it permanently.
-                                </div>
-
-                                <div className="text-xs text-slate-600 font-semibold pt-2">
-                                    Leaving will remove you from the class and cancel all your upcoming sessions for it.
+                                <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm md:text-base text-amber-900 font-extrabold">
+                                    Leaving this class will fully cancel all your lessons.
                                 </div>
                             </div>
 
-                            <div className="mt-5 flex flex-col md:flex-row gap-3">
+                            <div className="mt-6">
                                 <button
                                     disabled={actionLoading}
                                     onClick={() => cancelClassFully(modal.item.classId)}
-                                    className="w-full inline-flex items-center justify-center px-4 py-3 rounded-2xl bg-rose-600 hover:bg-rose-700 disabled:opacity-60 text-white font-extrabold transition"
+                                    className="w-full inline-flex items-center justify-center px-5 py-4 rounded-2xl bg-rose-600 hover:bg-rose-700 disabled:opacity-60 text-white text-base md:text-lg font-extrabold transition"
                                 >
-                                    {actionLoading ? "Cancelling…" : "Cancel / leave this class"}
-                                </button>
-
-                                <button
-                                    disabled={actionLoading}
-                                    onClick={() => setModal({ open: false })}
-                                    className="w-full inline-flex items-center justify-center px-4 py-3 rounded-2xl border border-slate-200 hover:bg-slate-50 disabled:opacity-60 font-extrabold transition"
-                                >
-                                    Back
+                                    {actionLoading ? "Cancelling…" : "Leave this class"}
                                 </button>
                             </div>
                         </div>
                     </div>
                 </div>
             )}
+
         </div>
     );
 }

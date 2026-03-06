@@ -49,28 +49,19 @@ export default function TopBar({
             if (cancelled) return;
 
             setIsLoggedIn(state.isLoggedIn);
-
-            // ✅ expects checkAuth() to return role as "student" | "tutor" | "admin" (or null)
-            // If your checkAuth returns uppercase, it should already normalize it (like your previous normalizeRoleLower logic).
             setRole((state as any).role ?? null);
 
             setIsLoading(false);
 
-            // if auth flips to logged out, close menu
             if (!state.isLoggedIn) setMenuOpen(false);
         };
 
-        // Initial check on mount / reload
         refresh();
 
-        // Same-tab auth updates
         const onAuthChanged = () => refresh();
 
-        // Other-tab auth updates
         const onStorage = (e: StorageEvent) => {
-            if (e.key === "token" || e.key === "userRole" || e.key === "userName") {
-                refresh();
-            }
+            if (e.key === "token" || e.key === "userRole" || e.key === "userName") refresh();
         };
 
         window.addEventListener(AUTH_CHANGED_EVENT, onAuthChanged);
@@ -90,9 +81,7 @@ export default function TopBar({
         const onDown = (e: MouseEvent | TouchEvent) => {
             const target = e.target as Node | null;
             if (!target) return;
-            if (menuRef.current && !menuRef.current.contains(target)) {
-                setMenuOpen(false);
-            }
+            if (menuRef.current && !menuRef.current.contains(target)) setMenuOpen(false);
         };
 
         window.addEventListener("mousedown", onDown);
@@ -105,10 +94,17 @@ export default function TopBar({
     }, [menuOpen]);
 
     const signOut = () => {
-        clearAuthData(); // removes token/role/name + triggers auth:changed
+        clearAuthData();
         setMenuOpen(false);
         navigate("/", { replace: true });
     };
+
+    const isStudent = role === "student";
+    const onStudentDashboard = location.pathname.startsWith("/dashboard/student");
+
+    const leftLabel = !isLoggedIn ? "SUMIT" : isStudent && onStudentDashboard ? "SUMIT" : "Dashboard";
+
+    const leftButtonClass = "font-extrabold text-base tracking-tight hover:opacity-80 transition-opacity";
 
     const onLogoClick = () => {
         if (isLoading) return;
@@ -121,22 +117,35 @@ export default function TopBar({
         navigate(getDashboardPath(role));
     };
 
+    const goFindClass = () => navigate("/find-tutor");
+
     return (
-        <header className="border-b border-slate-200 px-4 py-3 flex items-center justify-between bg-white sticky top-0 z-50">
-            {/* Logo / Home */}
-            <button
-                className="font-extrabold text-lg tracking-tight hover:opacity-80 transition-opacity"
-                onClick={onLogoClick}
-            >
-                Sumit
+        <header className="border-b border-slate-200 px-4 h-12 flex items-center justify-between bg-white sticky top-0 z-50">
+            {/* Left label */}
+            <button className={leftButtonClass} onClick={onLogoClick}>
+                {leftLabel}
             </button>
 
             {/* Right-side Actions */}
             <div className="flex items-center gap-2">
+                {/* Only show Find a class when logged in */}
+                {!isLoading && isLoggedIn && (
+                    <button
+                        onClick={goFindClass}
+                        className="inline-flex items-center gap-2 text-sm px-3 py-2 rounded-2xl bg-slate-900 hover:bg-slate-800 text-white transition font-semibold"
+                    >
+                        Find a class
+                        <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                            <path d="M10 18a8 8 0 1 1 5.293-14.293A8 8 0 0 1 10 18z" strokeWidth="1.8" />
+                            <path d="M21 21l-4.3-4.3" strokeWidth="1.8" strokeLinecap="round" />
+                        </svg>
+                    </button>
+                )}
+
                 {showBackButton && (
                     <button
                         onClick={() => navigate(-1)}
-                        className="text-sm px-3 py-2 rounded-2xl border border-slate-200 bg-white hover:bg-slate-50 transition font-semibold"
+                        className="text-sm px-3 py-1.5 rounded-2xl border border-slate-200 bg-white hover:bg-slate-50 transition font-semibold"
                     >
                         {backButtonText}
                     </button>
@@ -144,19 +153,18 @@ export default function TopBar({
 
                 {customActions}
 
-                {/* Auth-dependent actions */}
                 {isLoading ? null : !isLoggedIn ? (
                     /* LOGGED OUT */
                     <div className="flex items-center gap-2">
                         <button
                             onClick={() => navigate("/signup", { state: { returnTo } })}
-                            className="text-sm px-3 py-2 rounded-2xl border border-slate-200 bg-white hover:bg-slate-50 transition font-semibold"
+                            className="text-sm px-3 py-1.5 rounded-2xl border border-slate-200 bg-white hover:bg-slate-50 transition font-semibold"
                         >
                             Sign Up
                         </button>
                         <button
                             onClick={() => navigate("/login", { state: { returnTo } })}
-                            className="text-sm px-3 py-2 rounded-2xl bg-slate-900 hover:bg-slate-800 text-white transition font-semibold"
+                            className="text-sm px-3 py-1.5 rounded-2xl bg-slate-900 hover:bg-slate-800 text-white transition font-semibold"
                         >
                             Login
                         </button>
@@ -167,13 +175,13 @@ export default function TopBar({
                         <button
                             onClick={() => setMenuOpen((v) => !v)}
                             aria-label="Profile"
-                            className="flex items-center justify-center h-10 w-10 rounded-full border border-slate-300 bg-white hover:bg-slate-50 hover:border-slate-400 transition"
+                            className="flex items-center justify-center h-8 w-8 rounded-full border border-slate-300 bg-white text-slate-900 hover:bg-slate-50 hover:border-slate-400 transition"
                         >
                             <svg
-                                className="h-5 w-5"
+                                className="h-4 w-4"
                                 viewBox="0 0 24 24"
                                 fill="none"
-                                stroke="#355C99"
+                                stroke="currentColor"
                                 strokeWidth="1.7"
                                 strokeLinecap="round"
                                 strokeLinejoin="round"
@@ -187,7 +195,7 @@ export default function TopBar({
                             <div className="absolute right-0 mt-2 w-44 rounded-2xl border border-slate-200 bg-white shadow-lg overflow-hidden z-50">
                                 <button
                                     onClick={signOut}
-                                    className="w-full text-left px-4 py-3 text-sm font-extrabold text-rose-600 hover:bg-rose-50 transition"
+                                    className="w-full text-left px-4 py-2 text-sm font-extrabold text-rose-600 hover:bg-rose-50 transition"
                                 >
                                     Sign Out
                                 </button>

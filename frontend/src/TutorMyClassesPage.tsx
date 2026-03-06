@@ -131,7 +131,7 @@ export default function TutorMyClassesPage() {
                 <div className="max-w-6xl mx-auto space-y-6">
                     <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3">
                         <div>
-                            <h1 className="text-2xl md:text-3xl font-semibold tracking-tight">Your class templates</h1>
+                            <h1 className="text-2xl md:text-3xl font-semibold tracking-tight">Your classes</h1>
                             <p className="text-sm text-slate-400 mt-1">
                                 This is the overview of all classes you created. Click a class later to manage students or terminate it.
                             </p>
@@ -197,10 +197,6 @@ export default function TutorMyClassesPage() {
                                         >
                                             Manage
                                         </button>
-
-                                        <span className="text-xs text-slate-500">
-                                            Class ID: <span className="text-slate-300">{c.classId}</span>
-                                        </span>
                                     </div>
                                 </div>
                             ))}

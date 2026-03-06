@@ -20,7 +20,6 @@ type StudentDTO = {
     studentUserId: number;
     studentFirstName: string;
     studentLastName: string;
-    studentEmail: string;
     paymentMethodSelected: PaymentMethodSelectedEnum | null;
 };
 
@@ -397,12 +396,6 @@ export default function TutorDashboard() {
                             <p className="text-2xl font-extrabold mt-1">{uniqueStudentsCount}</p>
                             <p className="text-xs text-slate-500 font-semibold mt-1">unique across recurrences</p>
                         </div>
-
-                        <div className="rounded-3xl border border-black bg-white p-5 shadow-[0_10px_30px_rgba(2,6,23,0.08)]">
-                            <p className="text-xs uppercase tracking-wide text-slate-500 font-semibold">Needs attention</p>
-                            <p className="text-2xl font-extrabold mt-1">{pastScheduledRows.length}</p>
-                            <p className="text-xs text-slate-500 font-semibold mt-1">past sessions still SCHEDULED</p>
-                        </div>
                     </section>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -691,9 +684,6 @@ export default function TutorDashboard() {
                                                         <div className="text-sm font-extrabold text-slate-900 truncate">
                                                             {s.studentFirstName} {s.studentLastName}
                                                         </div>
-                                                        <div className="text-xs text-slate-600 font-semibold mt-1 truncate">
-                                                            {s.studentEmail}
-                                                        </div>
                                                     </div>
 
                                                     <div className="shrink-0 text-right">
@@ -710,22 +700,45 @@ export default function TutorDashboard() {
 
                             <div className="mt-5 flex justify-center">
                                 <button
-                                    onClick={() => {
-                                        setModal({ open: false });
+                                    onClick={async () => {
+                                        if (!token) return;
+
+                                        try {
+                                            const res = await fetch(
+                                                `${API_BASE_URL}/api/classes/tutor/recurrence/${modal.recurrenceItem.recurrenceClassId}/cancel`,
+                                                {
+                                                    method: "PATCH",
+                                                    headers: {
+                                                        Authorization: `Bearer ${token}`,
+                                                    },
+                                                }
+                                            );
+
+                                            if (!res.ok) {
+                                                const text = await res.text();
+                                                throw new Error(text || "Failed to cancel class");
+                                            }
+
+                                            setModal({ open: false });
+                                            refreshDashboard();
+                                        } catch (e) {
+                                            alert(e instanceof Error ? e.message : "Failed to cancel class");
+                                        }
                                     }}
                                     className="
-      inline-flex items-center justify-center
-      px-7 py-3
-      rounded-2xl
-      border-2 border-rose-700
-      bg-rose-700
-      text-white
-      font-extrabold
-      transition
+        inline-flex items-center justify-center
+        px-7 py-3
+        rounded-2xl
+        border-2 border-rose-700
+        bg-rose-700
+        text-white
+        font-extrabold
+        transition
     "
                                 >
                                     Cancel class
                                 </button>
+
                             </div>
 
 

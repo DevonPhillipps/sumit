@@ -100,12 +100,20 @@ public class ClassesController {
         return ResponseEntity.noContent().build();
     }
 
-    @PatchMapping("tutor/recurrence/{recurrenceClassId}/cancel")
-    @PreAuthorize("hasRole('TUTOR') or hasRole('ADMIN')")
+    @PatchMapping("/tutor/recurrence/{recurrenceClassId}/cancel")
+    @PreAuthorize("hasRole('TUTOR') || hasRole('ADMIN')")
     public ResponseEntity<Void> tutorCancelRecurrenceClass(@PathVariable Integer recurrenceClassId, @AuthenticationPrincipal UserDetails userDetails) {
         Integer userId = Integer.parseInt(userDetails.getUsername());
         classesService.tutorCancelRecurrenceClass(recurrenceClassId, userId);
         return ResponseEntity.noContent().build();
     }
+
+    @GetMapping("/admin/pending-group-classes-count")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<Long> getPendingGroupClassesCount(@AuthenticationPrincipal UserDetails userDetails) {
+        Integer userId = Integer.parseInt(userDetails.getUsername());
+        return ResponseEntity.ok(classesService.getPendingGroupClassesCount(userId));
+    }
+
 
 }

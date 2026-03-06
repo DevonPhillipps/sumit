@@ -111,6 +111,10 @@ const TIMESLOTS_GET_ALL = `${TIMESLOTS_BASE}/get-timeslots`;
 const VENUE_TIMESLOTS_BASE = `${API_BASE}/api/venue-timeslots`;
 const VENUE_TIMESLOTS_CREATE = `${VENUE_TIMESLOTS_BASE}/create`;
 
+const CLASSES_BASE = `${API_BASE}/api/classes`;
+const PENDING_GROUP_CLASSES_COUNT = `${CLASSES_BASE}/admin/pending-group-classes-count`;
+
+
 function timeAgo(iso: string) {
     const d = new Date(iso);
     const diff = Date.now() - d.getTime();
@@ -307,6 +311,10 @@ function AdminDashboard() {
     const timeslotCount = timeslots.length;
     const assignmentCount = venueTimeslots.length;
 
+    const [pendingGroupClassesCount, setPendingGroupClassesCount] = useState<number | null>(null);
+    const [pendingGroupClassesCountLoading, setPendingGroupClassesCountLoading] = useState(false);
+
+
     useEffect(() => {
         const verifyRole = async () => {
             const token = localStorage.getItem("token");
@@ -371,8 +379,24 @@ function AdminDashboard() {
         }
     };
 
+    const fetchPendingGroupClassesCount = async () => {
+        setPendingGroupClassesCountLoading(true);
+        try {
+            const res = await apiFetch(PENDING_GROUP_CLASSES_COUNT, { method: "GET" });
+            const count = (await res.json()) as number;
+            setPendingGroupClassesCount(Number.isFinite(count) ? count : 0);
+        } catch {
+            // don’t hard-fail the whole dashboard if this endpoint fails
+            setPendingGroupClassesCount(0);
+        } finally {
+            setPendingGroupClassesCountLoading(false);
+        }
+    };
+
+
     useEffect(() => {
         fetchPendingTutors();
+        fetchPendingGroupClassesCount(); // ✅ add this
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
@@ -911,7 +935,7 @@ function AdminDashboard() {
                             }}
                         >
                             <p className="text-xs uppercase tracking-wide text-slate-400">Venues</p>
-                            <p className="text-2xl font-semibold mt-1">{venueCount}</p>
+                            <p className="text-2xl font-semibold mt-1">Manage</p>
                             <p className="text-xs text-slate-500 mt-1">create + list + assign</p>
                         </button>
 
@@ -922,7 +946,9 @@ function AdminDashboard() {
                             onClick={() => setIsPendingGroupClassesOpen(true)}
                         >
                             <p className="text-xs uppercase tracking-wide text-slate-400">Pending group classes</p>
-                            <p className="text-2xl font-semibold mt-1">Review</p>
+                            <p className="text-2xl font-semibold mt-1">
+                                {pendingGroupClassesCountLoading ? "…" : (pendingGroupClassesCount ?? 0)}
+                            </p>
                             <p className="text-xs text-slate-500 mt-1">approve / reject</p>
                         </button>
                     </section>
@@ -1369,16 +1395,6 @@ function AdminDashboard() {
                                         Refresh data
                                     </button>
                                 </div>
-
-                                <div className="mt-2 text-[11px] text-slate-500">
-                                    Using backend:{" "}
-                                    <span className="text-slate-400">{LOCATION_GET_TOWNS}</span> ·{" "}
-                                    <span className="text-slate-400">{LOCATION_GET_VENUES}</span> ·{" "}
-                                    <span className="text-slate-400">{LOCATION_CREATE_VENUE}</span> ·{" "}
-                                    <span className="text-slate-400">{TIMESLOTS_GET_ALL}</span> ·{" "}
-                                    <span className="text-slate-400">{TIMESLOTS_CREATE}</span> ·{" "}
-                                    <span className="text-slate-400">{VENUE_TIMESLOTS_CREATE}</span>
-                                </div>
                             </div>
 
                             <div className="h-[calc(100%-116px)] overflow-y-auto">
@@ -1467,16 +1483,6 @@ function AdminDashboard() {
                                         />
                                     )}
                                 </div>
-                            </div>
-
-                            <div className="absolute bottom-0 left-0 right-0 border-t border-slate-800 bg-slate-950/70 px-5 py-3 flex items-center justify-between">
-                                <div className="text-xs text-slate-500">ESC to close · Venues/Towns/Timeslots fetched from backend</div>
-                                <button
-                                    className="text-xs px-3 py-1 rounded-full border border-slate-700 hover:border-sky-500 text-slate-200 transition"
-                                    onClick={() => setIsSchedulingModalOpen(false)}
-                                >
-                                    Close
-                                </button>
                             </div>
                         </div>
                     </div>

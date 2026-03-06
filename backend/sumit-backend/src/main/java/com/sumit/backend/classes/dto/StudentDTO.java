@@ -7,7 +7,6 @@ public class StudentDTO {
     private Integer recurrenceClassStudentId;
     private String studentFirstName;
     private String studentLastName;
-    private String studentEmail;
     private PaymentMethodSelectedEnum paymentMethodSelected;
 
     public Integer getStudentUserId() {
@@ -32,14 +31,6 @@ public class StudentDTO {
 
     public void setStudentLastName(String studentLastName) {
         this.studentLastName = studentLastName;
-    }
-
-    public String getStudentEmail() {
-        return studentEmail;
-    }
-
-    public void setStudentEmail(String studentEmail) {
-        this.studentEmail = studentEmail;
     }
 
     public PaymentMethodSelectedEnum getPaymentMethodSelected() {

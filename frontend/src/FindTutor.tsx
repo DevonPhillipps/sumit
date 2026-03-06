@@ -3,6 +3,9 @@ import { useNavigate } from "react-router-dom";
 import TopBar from "./components/TopBar";
 import { API_BASE_URL } from "./config/api";
 
+// ✅ Hardcoded venue image (Vite import)
+import venueInteriorNoStudents from "../images/venue-interior-no-students.webp";
+
 type TownDTO = { id: number; name: string };
 type SubjectWithoutGradesDTO = { id: number; name: string };
 type LanguageDTO = { id: number; name: string };
@@ -23,7 +26,7 @@ type ClassDTO = {
     tutorId: number | null;
     startTime: string; // "HH:mm:ss"
     endTime: string; // "HH:mm:ss"
-    dayOfWeek: string; // Java DayOfWeek -> "MONDAY"
+    dayOfWeek: string; // "MONDAY"
 };
 
 const API_BASE = API_BASE_URL;
@@ -75,6 +78,10 @@ function FindTutor() {
     // Focus handling (fix "lingering blue border / second tap doesn't open" on mobile)
     const [focused, setFocused] = useState<FocusKey>(null);
     const activeSelectRef = useRef<HTMLSelectElement | null>(null);
+
+    // ✅ Venue modal
+    const [venueModalOpen, setVenueModalOpen] = useState(false);
+    const [venueModalTitle, setVenueModalTitle] = useState<string>("Venue");
 
     const blurActive = () => {
         const el = activeSelectRef.current || (document.activeElement as HTMLElement | null);
@@ -232,13 +239,8 @@ function FindTutor() {
 
         const left = Math.max(0, max - cur);
 
-        if (isAlmostFull(cur, max)) {
-            return `Only ${left} spot${left === 1 ? "" : "s"} left`;
-        }
-
-        if (isNewClass(cur, max)) {
-            return `Max ${max} students · New class`;
-        }
+        if (isAlmostFull(cur, max)) return `Only ${left} spot${left === 1 ? "" : "s"} left`;
+        if (isNewClass(cur, max)) return `Max ${max} students`;
 
         return `${cur}/${max} enrolled · ${left} spot${left === 1 ? "" : "s"} left`;
     };
@@ -259,6 +261,23 @@ function FindTutor() {
         return [base, tall, border].join(" ");
     };
 
+    const openVenueModal = (title: string) => {
+        setVenueModalTitle(title || "Venue");
+        setVenueModalOpen(true);
+    };
+
+    const closeVenueModal = () => setVenueModalOpen(false);
+
+    // close modal with ESC
+    useEffect(() => {
+        if (!venueModalOpen) return;
+        const onKey = (e: KeyboardEvent) => {
+            if (e.key === "Escape") closeVenueModal();
+        };
+        window.addEventListener("keydown", onKey);
+        return () => window.removeEventListener("keydown", onKey);
+    }, [venueModalOpen]);
+
     return (
         <div
             className="min-h-screen flex flex-col bg-slate-100 text-slate-900 overflow-x-hidden"
@@ -275,6 +294,51 @@ function FindTutor() {
         >
             {/* TOP BAR */}
             <TopBar />
+
+            {/* ✅ VENUE MODAL */}
+            {venueModalOpen && (
+                <div
+                    className="fixed inset-0 z-[60] flex items-center justify-center px-4"
+                    role="dialog"
+                    aria-modal="true"
+                    onMouseDown={(e) => {
+                        // click outside closes
+                        if (e.target === e.currentTarget) closeVenueModal();
+                    }}
+                >
+                    <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
+
+                    <div className="relative z-[61] w-full max-w-4xl rounded-3xl border border-black bg-white shadow-[0_30px_80px_rgba(2,6,23,0.35)] overflow-hidden">
+                        <div className="flex items-center justify-between gap-3 px-5 py-4 border-b border-slate-200">
+                            <div className="min-w-0">
+                                <p className="text-sm font-black text-slate-900 truncate">{venueModalTitle}</p>
+                            </div>
+
+                            <button
+                                className="inline-flex items-center gap-2 text-[12px] md:text-[13px] px-3 py-2 rounded-2xl border border-slate-200 bg-white hover:bg-slate-50 transition font-extrabold text-slate-900"
+                                onClick={closeVenueModal}
+                            >
+                                Close
+                                <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                                    <path d="M6 6l12 12" strokeWidth="2" strokeLinecap="round" />
+                                    <path d="M18 6l-12 12" strokeWidth="2" strokeLinecap="round" />
+                                </svg>
+                            </button>
+                        </div>
+
+                        <div className="p-4 md:p-6">
+                            <div className="rounded-2xl overflow-hidden border border-slate-200 bg-slate-50">
+                                <img
+                                    src={venueInteriorNoStudents}
+                                    alt="Venue interior"
+                                    className="w-full h-auto object-cover"
+                                    loading="lazy"
+                                />
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* MAIN */}
             <main className="relative flex-1 overflow-y-auto bg-white">
@@ -447,8 +511,8 @@ function FindTutor() {
                             <div className="flex items-center justify-between mb-4">
                                 <h2 className="text-base md:text-lg font-extrabold text-slate-900">Available classes</h2>
                                 <span className="text-sm text-slate-600 font-semibold">
-                                    {selectedComboId === "" ? "Select a grade" : classesLoading ? "Loading..." : `${classes.length} found`}
-                                </span>
+                  {selectedComboId === "" ? "Select a grade" : classesLoading ? "Loading..." : `${classes.length} found`}
+                </span>
                             </div>
 
                             {selectedComboId === "" ? (
@@ -477,23 +541,23 @@ function FindTutor() {
                                                 {/* New pill top-right */}
                                                 {pills.showNew && (
                                                     <div className="absolute top-4 right-4">
-                                                        <span className="inline-flex items-center px-3 py-1 rounded-full text-[12px] md:text-[13px] border border-slate-300 bg-slate-50 text-slate-900 font-extrabold">
-                                                            New
-                                                        </span>
+                            <span className="inline-flex items-center px-3 py-1 rounded-full text-[12px] md:text-[13px] border border-slate-300 bg-slate-50 text-slate-900 font-extrabold">
+                              New
+                            </span>
                                                     </div>
                                                 )}
 
                                                 <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
                                                     <div className="min-w-0">
                                                         <div className="flex items-center gap-2 flex-wrap">
-                                                            <span className="inline-flex items-center px-4 py-1.5 rounded-full text-[14px] md:text-[15px] border-2 border-blue-900 bg-blue-100 text-black font-extrabold">
-                                                                {normalizeDay(cls.dayOfWeek)} · {formatTime(cls.startTime)}–{formatTime(cls.endTime)}
-                                                            </span>
+                              <span className="inline-flex items-center px-4 py-1.5 rounded-full text-[14px] md:text-[15px] border-2 border-blue-900 bg-blue-100 text-black font-extrabold">
+                                {normalizeDay(cls.dayOfWeek)} · {formatTime(cls.startTime)}–{formatTime(cls.endTime)}
+                              </span>
 
                                                             {pills.showAlmost && (
                                                                 <span className="inline-flex items-center px-3 py-1 rounded-full text-[12px] md:text-[13px] border border-amber-300 bg-amber-50 text-amber-900 font-extrabold">
-                                                                    Almost full
-                                                                </span>
+                                  Almost full
+                                </span>
                                                             )}
                                                         </div>
 
@@ -501,19 +565,32 @@ function FindTutor() {
                                                             {cls.venueName || "Venue"}
                                                         </p>
 
-                                                        <div className="mt-2 flex items-center gap-3 flex-wrap">
+                                                        {/* ✅ NEW: View venue button directly under venue name */}
+                                                        <div className="mt-2">
+                                                            <button
+                                                                className="inline-flex items-center gap-1 text-[12px] md:text-[13px] px-3 py-2 rounded-2xl border border-black bg-white hover:bg-slate-50 transition font-extrabold text-slate-900"
+                                                                onClick={() => openVenueModal(cls.venueName || "Venue")}
+                                                                type="button"
+                                                            >
+                                                                View venue →
+                                                            </button>
+
+                                                        </div>
+
+                                                        <div className="mt-3 flex items-center gap-3 flex-wrap">
                                                             <p className="text-[15px] md:text-[16px] text-slate-800 font-medium">
-                                                                Tutor:{" "}
-                                                                <span className="text-blue-900 font-extrabold">{cls.tutorName || "Unknown"}</span>
+                                                                Tutor: <span className="text-blue-900 font-extrabold">{cls.tutorName || "Unknown"}</span>
                                                             </p>
 
                                                             {cls.tutorId && (
                                                                 <button
-                                                                    className="inline-flex items-center gap-1 text-[12px] md:text-[13px] px-3 py-2 rounded-2xl border border-slate-200 bg-white hover:bg-slate-50 transition font-extrabold text-slate-900"
+                                                                    className="inline-flex items-center gap-1 text-[12px] md:text-[13px] px-3 py-2 rounded-2xl border border-black bg-white hover:bg-slate-50 transition font-extrabold text-slate-900"
                                                                     onClick={() => alert(`Tutor profile route later: /tutors/${cls.tutorId}`)}
+                                                                    type="button"
                                                                 >
                                                                     View profile →
                                                                 </button>
+
                                                             )}
                                                         </div>
 
@@ -521,12 +598,14 @@ function FindTutor() {
                                                             <span className="text-slate-700 font-bold">Address:</span>{" "}
                                                             <span className="text-slate-900">{cls.streetAddress || "Not set"}</span>
                                                         </p>
+
+                                                        {/* ✅ NOTE: No town text is rendered anywhere in this card */}
                                                     </div>
 
                                                     <div className="flex flex-col items-start md:items-end gap-3">
-                                                        <span className="text-[14px] md:text-[15px] text-slate-800 font-extrabold">
-                                                            {capacityLine(cls)}
-                                                        </span>
+                            <span className="text-[14px] md:text-[15px] text-slate-800 font-extrabold">
+                              {capacityLine(cls)}
+                            </span>
 
                                                         <div className="flex flex-wrap gap-2">
                                                             {cls.mapsUrl && (
@@ -534,25 +613,17 @@ function FindTutor() {
                                                                     href={cls.mapsUrl}
                                                                     target="_blank"
                                                                     rel="noreferrer"
-                                                                    className="inline-flex items-center gap-2 text-[12px] md:text-[13px] px-4 py-3 rounded-2xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-900 transition font-extrabold"
+                                                                    className="inline-flex items-center gap-2 text-[12px] md:text-[13px] px-4 py-3 rounded-2xl border border-black bg-white hover:bg-slate-50 text-slate-900 transition font-extrabold"
                                                                 >
-                                                                    Open map
-                                                                    <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                                                                        <path
-                                                                            d="M12 21s7-4.35 7-11a7 7 0 0 0-14 0c0 6.65 7 11 7 11z"
-                                                                            strokeWidth="1.6"
-                                                                        />
-                                                                        <path
-                                                                            d="M12 10.5a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5z"
-                                                                            strokeWidth="1.6"
-                                                                        />
-                                                                    </svg>
+                                                                    Open map →
                                                                 </a>
+
                                                             )}
 
                                                             <button
                                                                 className="inline-flex items-center gap-2 text-[12px] md:text-[13px] px-5 py-3 rounded-2xl bg-emerald-700 hover:bg-emerald-800 text-white font-extrabold transition"
                                                                 onClick={() => navigate(`/book-class/${cls.groupClassId}`, { state: { cls } })}
+                                                                type="button"
                                                             >
                                                                 Book class
                                                                 <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor">
@@ -577,11 +648,6 @@ function FindTutor() {
                     </div>
                 </div>
             </main>
-
-            {/* FOOTER */}
-            <footer className="px-4 py-5 border-t border-slate-200 text-sm text-slate-600 text-center font-medium">
-                © {new Date().getFullYear()} Sumit. All rights reserved.
-            </footer>
         </div>
     );
 }

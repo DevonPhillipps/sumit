@@ -4,6 +4,8 @@ import { useNavigate } from "react-router-dom";
 import TopBar from "./components/TopBar";
 import { checkAuth, type AuthState } from "./utils/auth";
 
+import venueInteriorWithStudents from "../images/venue-interior-with-students.webp";
+
 export default function App() {
     const navigate = useNavigate();
 
@@ -44,27 +46,6 @@ export default function App() {
 
     const handleFindTutorClick = () => navigate("/find-tutor");
 
-    const handleBecomeTutorClick = () => {
-        const token = localStorage.getItem("token");
-
-        if (!token || !auth.isLoggedIn) {
-            localStorage.setItem("postAuthRedirect", "/become-tutor");
-            navigate("/signup");
-            return;
-        }
-
-        const roleRaw = localStorage.getItem("userRole") || "STUDENT";
-        const role = roleRaw.toUpperCase();
-
-        if (role === "STUDENT") {
-            navigate("/become-tutor");
-        } else if (role === "TUTOR") {
-            navigate("/dashboard/tutor");
-        } else {
-            navigate("/dashboard/admin");
-        }
-    };
-
     return (
         <div className="min-h-screen flex flex-col text-slate-900 overflow-x-hidden">
             {/* TOP BAR */}
@@ -82,10 +63,10 @@ export default function App() {
                         className="absolute inset-0"
                         style={{
                             backgroundImage: `
-                                radial-gradient(1000px 800px at 18% 22%, rgba(53,92,153,0.55), transparent 65%),
-                                radial-gradient(1100px 900px at 82% 28%, rgba(53,92,153,0.38), transparent 70%),
-                                radial-gradient(1300px 1000px at 50% 85%, rgba(53,92,153,0.28), transparent 75%)
-                            `,
+                radial-gradient(1000px 800px at 18% 22%, rgba(53,92,153,0.55), transparent 65%),
+                radial-gradient(1100px 900px at 82% 28%, rgba(53,92,153,0.38), transparent 70%),
+                radial-gradient(1300px 1000px at 50% 85%, rgba(53,92,153,0.28), transparent 75%)
+              `,
                         }}
                     />
 
@@ -97,9 +78,9 @@ export default function App() {
                         className="absolute inset-0 opacity-[0.14]"
                         style={{
                             backgroundImage: `
-                                radial-gradient(circle, rgba(255,255,255,0.6) 1px, transparent 1.8px),
-                                radial-gradient(circle, rgba(255,255,255,0.35) 1px, transparent 2px)
-                            `,
+                radial-gradient(circle, rgba(255,255,255,0.6) 1px, transparent 1.8px),
+                radial-gradient(circle, rgba(255,255,255,0.35) 1px, transparent 2px)
+              `,
                             backgroundSize: "160px 160px, 260px 260px",
                             backgroundPosition: "0 0, 80px 120px",
                         }}
@@ -109,34 +90,107 @@ export default function App() {
                     <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_30%,transparent_20%,rgba(0,0,0,0.55)_85%)]" />
                 </div>
 
-                {/* HERO */}
+                {/* CONTENT */}
                 <section className="relative z-10 px-4 py-14 md:px-8 md:py-20">
-                    <div className="max-w-5xl mx-auto">
-                        <div className="rounded-3xl border border-black bg-white px-6 py-8 md:px-10 md:py-12 shadow-[0_12px_35px_rgba(2,6,23,0.10)] text-center md:text-left">
-                            <h1 className="text-4xl md:text-5xl font-extrabold tracking-tight leading-tight">
-                                Struggling to get those grades up?
-                                <span className="block mt-3" style={{ color: "#355C99" }}>
-                                    Find a tutor in under 5 clicks!
-                                </span>
-                            </h1>
+                    <div className="max-w-6xl mx-auto space-y-6">
+                        {/* HERO */}
+                        <div className="rounded-3xl border border-black bg-white px-6 py-8 md:px-10 md:py-12 shadow-[0_12px_35px_rgba(2,6,23,0.10)]">
+                            <div className="text-center md:text-left">
+                                <h1 className="text-4xl md:text-5xl font-extrabold tracking-tight leading-tight">
+                                    Struggling to get those grades up?
+                                    <span className="block mt-3" style={{ color: "#355C99" }}>
+                    Find a tutor in under 5 clicks!
+                  </span>
+                                </h1>
 
-                            <div className="mt-8 flex flex-col sm:flex-row gap-3 justify-center md:justify-start">
-                                <button
-                                    className="px-6 py-3 rounded-full text-white font-extrabold text-sm md:text-base transition
-                                               shadow-[0_10px_25px_rgba(53,92,153,0.22)]
-                                               hover:opacity-90"
-                                    style={{ backgroundColor: "#355C99" }}
-                                    onClick={handleFindTutorClick}
-                                >
-                                    Find a tutor
-                                </button>
+                                <div className="mt-8 flex justify-center md:justify-start">
+                                    <button
+                                        className="px-6 py-3 rounded-full text-white font-extrabold text-sm md:text-base transition
+                               shadow-[0_10px_25px_rgba(53,92,153,0.22)]
+                               hover:opacity-90"
+                                        style={{ backgroundColor: "#355C99" }}
+                                        onClick={handleFindTutorClick}
+                                    >
+                                        Find a tutor
+                                    </button>
+                                </div>
 
-                                <button
-                                    onClick={handleBecomeTutorClick}
-                                    className="px-6 py-3 rounded-full border border-slate-300 bg-white hover:bg-slate-50 text-sm md:text-base text-slate-900 font-extrabold transition"
-                                >
-                                    Become a tutor
-                                </button>
+                                {/* small trust line */}
+                                <p className="mt-6 text-sm text-slate-600 font-semibold">
+                                    Safe, local tutoring. Simple booking. Transparent pricing. First lesson FREE.
+                                </p>
+                            </div>
+                        </div>
+
+                        {/* IMAGE + ABOUT/CONTACT GRID */}
+                        <div className="grid gap-6 lg:grid-cols-3">
+                            {/* LEFT: Images (span 2 on large screens) */}
+                            <div className="lg:col-span-2 space-y-6">
+                                {/* Venue interior with students */}
+                                <div className="rounded-3xl border border-black bg-white shadow-[0_12px_35px_rgba(2,6,23,0.10)] overflow-hidden">
+                                    <div className="p-5 md:p-6">
+                                        <p className="text-sm font-extrabold text-slate-900">Real classes</p>
+                                        <p className="text-sm text-slate-600 font-medium mt-1">
+                                            Small groups. High attention. Real progress.
+                                        </p>
+                                    </div>
+                                    <div className="relative">
+                                        <img
+                                            src={venueInteriorWithStudents}
+                                            alt="Tutoring class interior"
+                                            className="w-full h-[240px] md:h-[320px] object-cover"
+                                            loading="lazy"
+                                        />
+                                        <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/20 to-transparent" />
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* RIGHT: About + Contact */}
+                            <div className="space-y-6">
+                                {/* About card */}
+                                <div className="rounded-3xl border border-black bg-white p-6 shadow-[0_12px_35px_rgba(2,6,23,0.10)]">
+                                    <h2 className="text-xl font-extrabold tracking-tight">About</h2>
+                                    <p className="mt-3 text-sm text-slate-700 font-medium leading-relaxed">
+                                        Sumit helps students improve marks with structured lessons, clear explanations, and consistent
+                                        practice. With a experienced tutors who have excelled in these subjects, and notes developed over years
+                                        by our tutors, you child will walk away with excellent notes and examples after every lesson.
+                                    </p>
+                                </div>
+
+                                {/* Contact card */}
+                                <div className="rounded-3xl border border-black bg-white p-6 shadow-[0_12px_35px_rgba(2,6,23,0.10)]">
+                                    <h2 className="text-xl font-extrabold tracking-tight">Contact us</h2>
+
+                                    <div className="mt-4 space-y-3">
+                                        <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3">
+                                            <p className="text-xs text-slate-500 font-bold uppercase tracking-wide">Email</p>
+                                            <p className="text-sm text-slate-900 font-extrabold">tutors.sumit@gmail.com</p>
+                                        </div>
+
+                                        <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3">
+                                            <p className="text-xs text-slate-500 font-bold uppercase tracking-wide">WhatsApp</p>
+                                            <p className="text-sm text-slate-900 font-extrabold">084 922 3333</p>
+                                        </div>
+                                    </div>
+
+                                    <button
+                                        className="mt-5 w-full px-6 py-3 rounded-full text-white font-extrabold text-sm transition
+                               shadow-[0_10px_25px_rgba(53,92,153,0.22)]
+                               hover:opacity-90"
+                                        style={{ backgroundColor: "#355C99" }}
+                                        onClick={handleFindTutorClick}
+                                    >
+                                        Browse available classes
+                                    </button>
+
+                                    {/* optional tiny auth note */}
+                                    {!auth.isLoading && !auth.isLoggedIn && (
+                                        <p className="mt-3 text-xs text-slate-500 font-semibold">
+                                            You can browse classes without logging in.
+                                        </p>
+                                    )}
+                                </div>
                             </div>
                         </div>
                     </div>

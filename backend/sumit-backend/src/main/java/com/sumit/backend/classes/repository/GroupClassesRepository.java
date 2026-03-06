@@ -21,4 +21,5 @@ public interface GroupClassesRepository extends JpaRepository<GroupClasses, Inte
     List<GroupClasses> findAllByTutorId(Integer tutorId);
     List<GroupClasses> findAllByStatus(GroupClassStatus groupClassStatus);
     List<GroupClasses> findAllByTutorIdAndStatus(Integer tutorId, GroupClassStatus status);
+    long countByStatus(GroupClassStatus status);
 }
